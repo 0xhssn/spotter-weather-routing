@@ -1,0 +1,147 @@
+{
+  "layout": [
+    {
+      "bottom": 799.8828125,
+      "height": 800,
+      "innerScroll": 8,
+      "kind": "sidebar",
+      "lastLineBottom": 783.8125,
+      "textFits": true,
+      "top": -0.1171875
+    },
+    {
+      "bottom": 1042.8828125,
+      "height": 1043,
+      "innerScroll": 0,
+      "kind": "sidebar",
+      "lastLineBottom": 813.8125,
+      "textFits": true,
+      "top": -0.1171875
+    },
+    {
+      "kind": "cards-1024",
+      "cardRects": [
+        {
+          "width": 349,
+          "x": 292,
+          "y": 467.1171875
+        },
+        {
+          "width": 349,
+          "x": 653,
+          "y": 467.1171875
+        }
+      ],
+      "firstCard": "Route 1, recommended, 25h 34m, 374 miles, High conditions, eligible",
+      "notices": 1,
+      "overflow": false,
+      "recommendation": true,
+      "sidebarHeight": 900,
+      "sidebarScroll": 0,
+      "stale": false,
+      "width": 1024
+    },
+    {
+      "kind": "three-cards-1024",
+      "cardRects": [
+        {
+          "width": 228.6640625,
+          "x": 292,
+          "y": 415.2265625
+        },
+        {
+          "width": 228.6640625,
+          "x": 532.6640625,
+          "y": 415.2265625
+        },
+        {
+          "width": 228.671875,
+          "x": 773.328125,
+          "y": 415.2265625
+        }
+      ],
+      "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+      "notices": 0,
+      "overflow": false,
+      "recommendation": true,
+      "sidebarHeight": 900,
+      "sidebarScroll": 0,
+      "stale": false,
+      "width": 1024
+    }
+  ],
+  "typography": [
+    {
+      "badge": "12px",
+      "bodyOverflow": 0,
+      "clipped": [],
+      "columns": "487px",
+      "count": 203,
+      "faint": [],
+      "fontStatus": "loaded",
+      "inputs": [
+        "14px",
+        "14px",
+        "14px",
+        "14px"
+      ],
+      "root": "16px",
+      "small": [],
+      "width": 768
+    },
+    {
+      "badge": "12px",
+      "bodyOverflow": 0,
+      "clipped": [],
+      "columns": "444px 444px",
+      "count": 204,
+      "faint": [],
+      "fontStatus": "loaded",
+      "inputs": [
+        "14px",
+        "14px",
+        "14px",
+        "14px"
+      ],
+      "root": "16px",
+      "small": [],
+      "width": 1280
+    },
+    {
+      "badge": "12px",
+      "bodyOverflow": 0,
+      "clipped": [],
+      "columns": "366px",
+      "count": 226,
+      "faint": [],
+      "fontStatus": "loaded",
+      "inputs": [
+        "16px",
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "root": "16px",
+      "small": [],
+      "width": 390
+    },
+    {
+      "badge": "12px",
+      "bodyOverflow": 0,
+      "clipped": [],
+      "columns": "228.664px 228.664px 228.672px",
+      "count": 227,
+      "faint": [],
+      "fontStatus": "loaded",
+      "inputs": [
+        "14px",
+        "14px",
+        "14px",
+        "14px"
+      ],
+      "root": "16px",
+      "small": [],
+      "width": 1024
+    }
+  ]
+}

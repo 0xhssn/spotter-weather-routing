@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownUp, ArrowRight, ChevronDown, Compass, FlaskConical, Info, LoaderCircle, Navigation, Route as RouteIcon, ShieldCheck, SlidersHorizontal, Truck, X } from 'lucide-react'
+import { ArrowDownUp, ArrowRight, ChevronDown, FlaskConical, LoaderCircle, Navigation, Route as RouteIcon, Truck, X } from 'lucide-react'
 import { api, ApiError } from './api'
 import { PlaceSearch } from './PlaceSearch'
 import { ForecastPanel } from './ForecastPanel'
 import { CheckpointTable, Recommendation, RouteCard } from './TripResults'
-import { departureISO, localInput, originZone, tripDate, tripTime, zoneLabel } from './time'
+import { departureISO, localInput, originZone, zoneLabel } from './time'
+import { Assumptions, StatusSlot, TripSummary } from './TripOverview'
+import type { TripNote } from './TripOverview'
 
 import type { Checkpoint, Place, Plan } from './types'
 
@@ -22,14 +24,15 @@ export default function App(){
   const [checkpoint,setCheckpoint]=useState<Checkpoint|null>(null)
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
+  const [errorCode,setErrorCode]=useState('')
   const [allowRoad,setAllowRoad]=useState(false)
   const [retryAfter,setRetryAfter]=useState(0)
   const [method,setMethod]=useState(false)
   const [tableOpen,setTableOpen]=useState(false)
   const inputZone=useRef('America/Los_Angeles')
   if(origin?.timezone)inputZone.current=origin.timezone
-  const currentInputs=useRef({origin,destination,departure,load,spacing})
-  currentInputs.current={origin,destination,departure,load,spacing}
+  const currentInputs=useRef({origin,destination,departure,load,spacing,allowRoad})
+  currentInputs.current={origin,destination,departure,load,spacing,allowRoad}
   const request=useRef<AbortController|null>(null)
   const requestSequence=useRef(0)
   const apply=(data:Plan)=>{setPlan(data);setSelectedId(data.recommended_id||data.routes[0]?.id || '');setCheckpoint(null)}
@@ -37,16 +40,16 @@ export default function App(){
     const initialInputs=currentInputs.current
     request.current?.abort();const controller=new AbortController();request.current=controller
     const sequence=++requestSequence.current
-    setBusy(true);setError('')
+    setBusy(true);setError('');setErrorCode('')
     try{
       const data=await api<Plan>(`/api/example?load_lb=${load}&spacing_miles=${spacing}`,{signal:controller.signal})
       if(sequence!==requestSequence.current)return
       apply(data)
       const current=currentInputs.current
-      if(current.origin===initialInputs.origin && current.destination===initialInputs.destination && current.departure===initialInputs.departure && current.load===initialInputs.load && current.spacing===initialInputs.spacing){
-        setOrigin(LA);setDestination(PHX);setDeparture(localInput(data.departure,originZone(data.origin.timezone)))
+      if(current.origin===initialInputs.origin && current.destination===initialInputs.destination && current.departure===initialInputs.departure && current.load===initialInputs.load && current.spacing===initialInputs.spacing && current.allowRoad===initialInputs.allowRoad){
+        setOrigin(LA);setDestination(PHX);setDeparture(localInput(data.departure,originZone(data.origin.timezone)));setAllowRoad(!!data.allow_road_fallback)
       }
-    }catch(e){if(sequence===requestSequence.current && !controller.signal.aborted && e instanceof Error && e.name!=='AbortError'){setError(e.message);if(e instanceof ApiError)setRetryAfter(e.retryAfter)}}
+    }catch(e){if(sequence===requestSequence.current && !controller.signal.aborted && e instanceof Error && e.name!=='AbortError'){setError(e.message);if(e instanceof ApiError){setRetryAfter(e.retryAfter);setErrorCode(e.code)}}}
     finally{if(sequence===requestSequence.current)setBusy(false)}
   }
   useEffect(()=>{void example();return ()=>request.current?.abort()},[]) // Load the explicitly labeled example once.
@@ -58,6 +61,10 @@ export default function App(){
   useEffect(()=>{
     if(!method)return
     const previous=document.activeElement as HTMLElement|null
+    const page=document.documentElement,body=document.body
+    const pageOverflow=page.style.overflow,bodyOverflow=body.style.overflow,gutter=page.style.scrollbarGutter
+    page.style.scrollbarGutter='stable'
+    page.style.overflow='hidden';body.style.overflow='hidden'
     const dialog=document.querySelector<HTMLElement>('[role="dialog"]')
     const close=dialog?.querySelector<HTMLButtonElement>('button')
     close?.focus()
@@ -66,7 +73,11 @@ export default function App(){
       if(event.key==='Tab'){event.preventDefault();close?.focus()}
     }
     document.addEventListener('keydown',handle)
-    return ()=>{document.removeEventListener('keydown',handle);previous?.focus()}
+    return ()=>{
+      document.removeEventListener('keydown',handle)
+      page.style.overflow=pageOverflow;body.style.overflow=bodyOverflow;page.style.scrollbarGutter=gutter
+      previous?.focus({preventScroll:true})
+    }
   },[method])
   async function compare(event:React.FormEvent){
     event.preventDefault()
@@ -74,14 +85,16 @@ export default function App(){
     if(!origin||!destination){setError('Choose both cities from the search results.');return}
     request.current?.abort();const controller=new AbortController();request.current=controller
     const sequence=++requestSequence.current
-    setBusy(true);setError('')
+    setBusy(true);setError('');setErrorCode('')
     try{
       const data=await api<Plan>('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({origin,destination,departure:departureISO(departure,originZone(origin.timezone)),load_lb:load,spacing_miles:spacing,allow_road_fallback:allowRoad})})
       if(sequence===requestSequence.current && !controller.signal.aborted)apply(data)
-    }catch(e){if(sequence===requestSequence.current && !controller.signal.aborted && e instanceof Error && e.name!=='AbortError'){setError(e.message);if(e instanceof ApiError)setRetryAfter(e.retryAfter)}}
+    }catch(e){if(sequence===requestSequence.current && !controller.signal.aborted && e instanceof Error && e.name!=='AbortError'){setError(e.message);if(e instanceof ApiError){setRetryAfter(e.retryAfter);setErrorCode(e.code)}}}
     finally{if(sequence===requestSequence.current)setBusy(false)}
   }
+  const showCheckpoint=useCallback((value:Checkpoint)=>{setCheckpoint(value);document.querySelector('.map-wrap')?.scrollIntoView?.({block:'center'})},[])
   const select=useCallback((id:string)=>{setSelectedId(id);setCheckpoint(null)},[])
+  const showOnMap=useCallback((id:string)=>{select(id);document.querySelector('.map-wrap')?.scrollIntoView?.({block:'center'})},[select])
   const selected=plan?.routes.find(r=>r.id===selectedId)
   const zone=inputZone.current
   const resultZone=originZone(plan?.origin.timezone)
@@ -100,47 +113,55 @@ export default function App(){
     !Number.isInteger(load)||load<0||load>100000?'Enter a whole-number load between 0 and 100,000 lb.':''
   const canCompare=!busy&&retryAfter===0&&!invalidInput
   const showUpdateBadge=dirty&&!busy
-  const compareHelp=busy?'Checking roads and weather…':retryAfter>0?`Please wait ${retryAfter} seconds before trying again.`:invalidInput||
-    (dirty?'Trip changed. Compare to update roads and weather.':
-      plan?.mode==='live'?'Live results shown. Compare again to recheck this trip.':'Compare to fetch live roads and weather for this trip.')
+  const stale=!!plan&&(dirty||!!error)
+  const unavailable=stale||busy
+  const compareHelp=busy?'':retryAfter>0?'Retry available after the countdown.':invalidInput||
+    (dirty?'Update needed.':plan?.mode==='live'?'Compare again to recheck this trip.':'Ready to compare live routes.')
+  const notes:TripNote[]=[]
+  const truckDistanceError=errorCode==='route_too_long'&&/truck router/i.test(error)
+  if(error)notes.push({id:'error',tone:'error',text:truckDistanceError?'This trip is too long for truck routing. Turn on car-profile comparison to see car routes.':error,
+    ...(truckDistanceError&&!allowRoad?{action:()=>{setAllowRoad(true);document.getElementById('allow-road')?.focus()},actionLabel:'Turn on'}:{})})
+  if(dirty)notes.push({id:'changed',tone:'warning',text:'Trip inputs changed. Compare routes to update these results.'})
+  if(plan?.routes.some(route=>route.routing_profile==='car'))notes.push({id:'car',tone:'warning',text:'Car-profile comparison: truck height, weight and access restrictions are not checked.'})
+  if(plan)for(const warning of plan.warnings){
+    if(/^(Road routes|Example scenario|Car-profile|All routes contain No Travel)/.test(warning))continue
+    notes.push({id:warning,tone:'info',text:warning.includes('distinct route(s)')?`Only ${plan.routes.length} different ${plan.routes.length===1?'route was':'routes were'} found.`:warning})
+  }
   return <div className="app-shell">
-    <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span><div className="topbar-right"><span className="assessment-tag">Built for Spotter</span><button className="icon-button" aria-label="How route recommendations work" onClick={()=>setMethod(true)}><Info size={19}/></button><span className="avatar">HH</span></div></header>
+    <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span></header>
     <div className="workspace">
       <aside className="sidebar">
-        <div className="sidebar-title"><div><span className="eyebrow">EVERY MILE, INFORMED</span><h2>A clearer road ahead.</h2></div><span className="title-mark"><Compass size={27}/></span></div>
-        <p className="intro">Plan your trip around the weather.<br/>Find the route with less risk.</p>
+        <div className="sidebar-title"><h2>Plan your trip</h2></div>
         <form onSubmit={compare}>
           <div className="location-fields"><PlaceSearch label="Origin" value={origin} onChange={changeOrigin}/><button type="button" className="swap-button" aria-label="Swap origin and destination" disabled={!origin||!destination} onClick={()=>{changeOrigin(destination);setDestination(origin)}}><ArrowDownUp size={14}/></button><PlaceSearch label="Destination" value={destination} onChange={setDestination}/></div>
           <label className="field-label" htmlFor="departure">Departure <span>At origin · {departureZone}</span></label><input id="departure" type="datetime-local" value={departure} min={localInput(new Date(),zone)} max={localInput(new Date(Date.now()+7*86400000),zone)} onChange={e=>setDeparture(e.target.value)} required/>
           <div className="load-heading"><label htmlFor="load">Load weight</label><Truck size={15}/></div><div className="weight-input"><input id="load" type="number" min="0" max="100000" step="1" required value={load} onChange={e=>setLoad(Number(e.target.value))}/><span>lb</span></div>
-          <div className="spacing-heading"><label>Weather checkpoints</label><span>Every</span></div><div className="segmented" role="group" aria-label="Checkpoint spacing">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} miles</button>)}</div>
-          <label className="fallback-option"><input type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)}/>Allow car-profile comparison</label><p className="fallback-help">Long trips only. Truck restrictions are not checked.</p>
+          <div className="spacing-heading"><span id="spacing-label">Check weather every</span></div><div className="segmented" role="group" aria-labelledby="spacing-label">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} mi</button>)}</div>
+          <fieldset className="long-trips"><legend>Long trips</legend><label className="fallback-option" htmlFor="allow-road"><input id="allow-road" type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)} aria-describedby="fallback-help"/>Allow car-profile comparison</label><p id="fallback-help" className="fallback-help">If the trip exceeds the truck router’s distance limit, compare car routes instead. Truck restrictions are not checked.</p></fieldset>
           <button type="submit" className={`primary-button${showUpdateBadge?' has-updates':''}`} disabled={!canCompare} aria-busy={busy} aria-describedby="compare-help">{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<span className="compare-button-label">Compare live routes<ArrowRight size={17}/></span>}{showUpdateBadge&&<span className="compare-update-badge" aria-hidden="true">Update needed</span>}</button>
-          <p id="compare-help" className="compare-help">{compareHelp}</p>
+          <p id="compare-help" className={`compare-help${dirty?' sr-only':''}`}>{compareHelp}</p>
           <button type="button" className="example-button" onClick={()=>void example()} disabled={busy}><FlaskConical size={14}/>Load example scenario</button>
         </form>
-        <div className="sidebar-footnote"><ShieldCheck size={18}/><p>Weather changes. Your route can too.<br/><span>Forecasts support your judgment.</span></p></div>
       </aside>
       <main className="main-content">
-        <div className="page-heading"><div><div className="breadcrumb">Route planner <span>/</span> Trip overview</div><h1>Your trip, with perspective.</h1><p>Compare the road ahead before you get behind the wheel.</p></div><button className="secondary-button" onClick={()=>setMethod(true)}><SlidersHorizontal size={15}/>How we compare</button></div>
-        {error && <div className="error-banner" role="alert"><Info size={18}/><span>{error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
+        {plan&&<TripSummary plan={plan} onMethod={()=>setMethod(true)}/>}
+        {!busy&&<StatusSlot notes={notes}/>}
         {plan && <>
-          <div className="trip-strip"><div><span className="trip-points"><span/>{plan.origin.label.split(',')[0]}<ArrowRight size={15}/>{plan.destination.label.split(',')[0]}</span><span className="trip-meta">{tripDate(plan.departure,resultZone)} · {tripTime(plan.departure,resultZone)} · {plan.load_lb.toLocaleString()} lb</span></div><span className={plan.mode==='example'?'data-tag example':'data-tag live'}><span/>{plan.mode==='example'?'EXAMPLE DATA':'LIVE FORECAST'}</span></div>
-          {dirty && <div className="changed-note"><Info size={14}/>Trip inputs changed. Compare routes to update these results.</div>}
-          {plan.mode==='example' && <div className="example-note"><FlaskConical size={14}/>Recorded roads + simulated weather. Compare live routes for current conditions.</div>}
-          {plan.warnings.filter(w=>!w.startsWith('Road routes')&&!w.startsWith('Example scenario')).map(w=><div className={`provider-notice ${w.startsWith('Car-profile')?'car-notice':''}`} key={w} role="note"><Info size={16}/><span>{w}</span></div>)}
-          <section className="route-cards" aria-label="Route options">{plan.routes.map((route,i)=><RouteCard key={route.id} route={route} index={i} selected={selectedId===route.id} recommended={route.id===plan.recommended_id} onSelect={select} departure={plan.departure} zone={resultZone}/>)}</section>
-          <Recommendation plan={plan} onSelect={select}/>
-          <ForecastPanel plan={plan} selectedId={selectedId} onSelect={select} busy={busy} checkpoint={checkpoint} onCheckpoint={setCheckpoint}/>
-          <div className="below-map"><span><Info size={14}/>The timeline shows weather and estimated vehicle progress. Route scores use each checkpoint’s arrival time.</span><button onClick={()=>setTableOpen(v=>!v)} aria-expanded={tableOpen}>Checkpoint details<ChevronDown size={15} style={{transform:tableOpen?'rotate(180deg)':undefined}}/></button></div>
-          {tableOpen && selected && <CheckpointTable route={selected} onCheckpoint={setCheckpoint} zone={resultZone}/>}
-          <div className="limitations"><Truck size={15}/><p>{plan.warnings.find(w=>w.startsWith('Road routes'))} {plan.warnings.filter(w=>!w.startsWith('Road routes')&&!w.startsWith('Example scenario')).join(' ')}</p></div>
-          <footer><span>Made for the miles ahead.</span><span>{plan.providers.routing.split(' / ')[0]} · Open-Meteo · OpenStreetMap</span></footer>
+          {unavailable&&<div className="results-context">Showing results for {plan.origin.label.split(',')[0]} → {plan.destination.label.split(',')[0]} · Previous comparison</div>}
+          <div className="results-region" aria-busy={busy}>
+            <div className={`results-content${unavailable?' is-stale':''}`} inert={unavailable}>
+              {!unavailable&&<Recommendation plan={plan} onSelect={showOnMap}/>}
+              <section className="route-cards" aria-label="Route options">{[...plan.routes].sort((a,b)=>Number(b.id===plan.recommended_id)-Number(a.id===plan.recommended_id)).map(route=><RouteCard key={route.id} route={route} selected={selectedId===route.id} recommended={!unavailable&&route.id===plan.recommended_id} onSelect={select} departure={plan.departure} zone={resultZone}/>)}</section>
+              <ForecastPanel plan={plan} selectedId={selectedId} onSelect={select} busy={unavailable} checkpoint={checkpoint} onCheckpoint={setCheckpoint}/>
+              {selected&&<section className="checkpoint-details" aria-label="Checkpoint details"><button className="checkpoint-toggle" aria-label="Checkpoint details" onClick={()=>setTableOpen(v=>!v)} aria-expanded={tableOpen} aria-controls="checkpoint-table"><strong>Checkpoint details</strong><span>{selected.name} · {selected.checkpoints.length} checkpoints · Times in {zoneLabel(plan.departure,resultZone)} (origin)</span><ChevronDown size={18} style={{transform:tableOpen?'rotate(180deg)':undefined}}/></button>{tableOpen&&<div id="checkpoint-table"><CheckpointTable route={selected} onCheckpoint={showCheckpoint} zone={resultZone}/></div>}</section>}
+            </div>
+            {busy&&<div className="results-loading" role="status"><LoaderCircle size={20} className="spin"/>Checking roads, arrival times, and weather…</div>}
+          </div>
+          <Assumptions plan={plan}/>
         </>}
         {!plan && <div className="empty-state">{busy?<LoaderCircle size={32} className="spin"/>:<RouteIcon size={36}/>}<h3>{busy?'Preparing your route planner…':'Let’s find a clearer road.'}</h3><p>Choose your cities, departure, and load to compare routes.</p></div>}
-        {busy && plan && <div className="working-badge" role="status"><LoaderCircle size={16} className="spin"/>Checking roads, arrival times, and weather…</div>}
       </main>
     </div>
-    {method && <div className="modal-backdrop" onClick={()=>setMethod(false)}><section className="method-modal" role="dialog" aria-modal="true" aria-labelledby="method-title" onClick={e=>e.stopPropagation()}><button className="modal-close" aria-label="Close explanation" onClick={()=>setMethod(false)}><X size={20}/></button><span className="eyebrow">THE LOGIC BEHIND THE LINE</span><h2 id="method-title">A safety-first comparison.</h2><p>We sample the road every 10, 25, or 50 miles and match the forecast to your estimated arrival at each checkpoint.</p><ol><li>Exclude any route with <strong>No Travel</strong> conditions.</li><li>Prefer the fewest <strong>Severe miles</strong>.</li><li>Then the fewest <strong>High miles</strong>.</li><li>Then the lowest distance-weighted average risk.</li><li>Use travel time as the final tie-breaker.</li></ol><p>The worse of two checkpoint risks applies to the road between them. Overlapping rain and snow boundaries use the higher category.</p><div className="rules-table"><table><thead><tr><th>Risk</th><th>Wind mph</th><th>Rain in/hr</th><th>Snow in/hr</th></tr></thead><tbody>{[['Low','<25','<0.10','<0.5'],['Moderate','25–<35','0.10–<0.25','0.5–<1'],['High','35–<45','0.25–<0.50','1–<2'],['Severe','45–<55','0.50–1.00','2–3'],['No Travel','≥55','>1.00','>3']].map(row=><tr key={row[0]}>{row.map(c=><td key={c}>{c}</td>)}</tr>)}</tbody></table></div><p><strong>Load overrides:</strong> wind ≥45 mph with a load over 30,000 lb means No Travel. Wind ≥35 mph with a load over 40,000 lb is at least Severe.</p><small>Wind and temperature are interpolated at arrival. Rain, snow and gusts use the hour containing arrival without smoothing precipitation peaks. Wind rules use sustained speed; gusts are shown separately. Weather can change between checkpoints. This assessment app is planning support, not a certified truck navigation system.</small></section></div>}
+    {method && <div className="modal-backdrop" onClick={()=>setMethod(false)}><section className="method-modal" role="dialog" aria-modal="true" aria-labelledby="method-title" onClick={e=>e.stopPropagation()}><button className="modal-close" aria-label="Close explanation" onClick={()=>setMethod(false)}><X size={20}/></button><span className="eyebrow">THE LOGIC BEHIND THE LINE</span><h2 id="method-title">A safety-first comparison.</h2><p>We sample the road every 10, 25, or 50 miles and match the forecast to your estimated arrival at each checkpoint.</p><ol><li>Exclude any route with <strong>No Travel</strong> conditions.</li><li>Prefer the fewest <strong>Severe miles</strong>.</li><li>Then the fewest <strong>High miles</strong>.</li><li>Then the lowest distance-weighted average risk.</li><li>Use travel time as the final tie-breaker.</li></ol><p>The full trip preview takes about 12 seconds and pauses at arrival (or at the 48-hour forecast limit for longer trips). The slider covers 48 hours of corridor weather, updated hourly. Route scores always use each checkpoint’s arrival time. Hover or tap the position marker for details.</p><p>The worse of two checkpoint risks applies to the road between them. Overlapping rain and snow boundaries use the higher category.</p><div className="rules-table"><table><thead><tr><th>Risk</th><th>Wind mph</th><th>Rain in/hr</th><th>Snow in/hr</th></tr></thead><tbody>{[['Low','<25','<0.10','<0.5'],['Moderate','25–<35','0.10–<0.25','0.5–<1'],['High','35–<45','0.25–<0.50','1–<2'],['Severe','45–<55','0.50–1.00','2–3'],['No Travel','≥55','>1.00','>3']].map(row=><tr key={row[0]}>{row.map(c=><td key={c}>{c}</td>)}</tr>)}</tbody></table></div><p><strong>Load overrides:</strong> wind ≥45 mph with a load over 30,000 lb means No Travel. Wind ≥35 mph with a load over 40,000 lb is at least Severe.</p><small>Wind and temperature are interpolated at arrival. Rain, snow and gusts use the hour containing arrival without smoothing precipitation peaks. Wind rules use sustained speed; gusts are shown separately. Weather can change between checkpoints. This assessment app is planning support, not a certified truck navigation system.</small></section></div>}
   </div>
 }

@@ -14,6 +14,6 @@ export function JourneyProgress({route,position}:{route:Route;position:JourneyPo
   return <div className="journey-progress" aria-label="Estimated route progress">
     <Vehicle size={19} aria-hidden="true"/>
     <div><strong>Estimated {route.routing_profile==='car'?'car':'truck'} position · {route.name}</strong><span>{position?journeyLabel(position):'Position estimate unavailable for this route.'}</span></div>
-    <small>{!route.summary.eligible?'No Travel — route excluded. Position preview only.':'Hover or tap the position marker for details. Estimates exclude traffic and rest stops.'}</small>
+    {!route.summary.eligible&&<small>No Travel — route excluded. Position preview only.</small>}
   </div>
 }

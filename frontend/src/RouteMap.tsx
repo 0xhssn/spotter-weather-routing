@@ -1,12 +1,14 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
+import { Focus } from 'lucide-react'
+import { CheckpointDetails } from './CheckpointDetails'
 import { CircleMarker, MapContainer, Marker, Pane, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { COLORS } from './types'
 import type { Checkpoint, Plan, Route } from './types'
 import { riskRaster } from './heatmap'
 import { thinCheckpoints } from './markers'
 import { riskMiles, travelTime } from './format'
-import { displayedArrival, originZone, tripDate, tripTime } from './time'
+import { dateTime, displayedArrival, originZone } from './time'
 import { journeyPosition } from './journey'
 import { journeyLabel } from './JourneyProgress'
 
@@ -101,7 +103,7 @@ function Heatmap({plan,hour,visible}:{plan:Plan;hour:number;visible:boolean}) {
 
 function RouteSummary({route,plan}:{route:Route;plan:Plan}) {
   const zone=originZone(plan.origin.timezone)
-  return <><strong>{route.name}{route.id===plan.recommended_id?' · Recommended':''}</strong><br/>{Math.round(route.distance_miles)} mi · {travelTime(route.duration_s)}<br/>ETA {tripDate(displayedArrival(plan.departure,route.duration_s),zone)} {tripTime(displayedArrival(plan.departure,route.duration_s),zone)}<br/>{riskMiles(route.summary.risk_miles.Severe)} severe mi · {riskMiles(route.summary.risk_miles.High)} high mi<br/>Average risk {route.summary.average_risk.toFixed(2)} / 4<br/>{route.summary.eligible?'Eligible for comparison':'No Travel — excluded'}{route.routing_profile==='car'&&<><br/><strong>Car profile — truck restrictions unchecked</strong></>}</>
+  return <><strong>{route.name}{route.id===plan.recommended_id?' · Recommended':''}</strong><br/>{Math.round(route.distance_miles)} mi · {travelTime(route.duration_s)}<br/>ETA {dateTime(displayedArrival(plan.departure,route.duration_s),zone)}<br/>{riskMiles(route.summary.risk_miles.Severe)} severe mi · {riskMiles(route.summary.risk_miles.High)} high mi<br/>Average risk {route.summary.average_risk.toFixed(2)} / 4<br/>{route.summary.eligible?'Eligible for comparison':'No Travel — excluded'}{route.routing_profile==='car'&&<><br/><strong>Car profile — truck restrictions unchecked</strong></>}</>
 }
 const RoadLayers=memo(function RoadLayers({plan,selectedId,onSelect}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void}) {
   const lines=useMemo(()=>plan.routes.map((route,index)=>({route,index,positions:route.geometry.coordinates.map(c=>[c[1],c[0]] as L.LatLngTuple)})),[plan])
@@ -109,17 +111,30 @@ const RoadLayers=memo(function RoadLayers({plan,selectedId,onSelect}:{plan:Plan;
   return <>{lines.map(({route,index,positions})=><Polyline key={route.id} positions={positions} pathOptions={{color:routeColors[index%3],weight:3.5,opacity:.5,lineCap:'round'}} eventHandlers={{click:()=>onSelect(route.id)}}><Popup><RouteSummary route={route} plan={plan}/></Popup></Polyline>)}
     <Pane name="selected-route" style={{zIndex:425}}>{selected&&<><Polyline key={`${selectedId}-casing`} positions={selected.positions} pathOptions={{color:'white',weight:10,opacity:1}} interactive={false}/><Polyline key={selectedId} positions={selected.positions} pathOptions={{color:routeColors[selected.index%3],weight:6,opacity:1,lineCap:'round'}}><Popup><RouteSummary route={selected.route} plan={plan}/></Popup></Polyline></>}</Pane></>
 })
-const CheckpointLayers=memo(function CheckpointLayers({plan,selectedId,onSelect,onCheckpoint,visible}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void;onCheckpoint:(c:Checkpoint)=>void;visible:boolean}) {
+const CheckpointLayers=memo(function CheckpointLayers({plan,selectedId,onSelect,onCheckpoint,visible,checkpoint}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void;onCheckpoint:(c:Checkpoint|null)=>void;visible:boolean;checkpoint:Checkpoint|null}) {
   const map=useMap(),[zoom,setZoom]=useState(map.getZoom());useMapEvents({zoomend:()=>setZoom(map.getZoom())})
+  const popup=useRef<L.Popup|null>(null)
   const zone=originZone(plan.origin.timezone)
   const checkpoints=useMemo(()=>plan.routes.flatMap(route=>thinCheckpoints(route.checkpoints,point=>map.project([point.lat,point.lon],zoom)).map(c=>({route,c}))),[plan,map,zoom])
   const selected=plan.routes.find(r=>r.id===selectedId)
+  // Popup auto-pan keeps details and the highlighted location visible together, including table selections.
+  useEffect(()=>{
+    if(checkpoint)popup.current?.openOn(map)
+    else if(popup.current)map.closePopup(popup.current)
+  },[checkpoint,map])
+  useEffect(()=>{
+    const keepPopupVisible=()=>popup.current?.update()
+    map.on('resize',keepPopupVisible)
+    return ()=>{map.off('resize',keepPopupVisible)}
+  },[map])
   return <Pane name="checkpoint-markers" style={{zIndex:450}}>
-    {visible&&checkpoints.map(({route,c})=><CircleMarker key={c.id} center={[c.lat,c.lon]} radius={route.id===selectedId?3.8:2} pathOptions={{color:'white',weight:1.1,fillColor:COLORS[c.risk.score],fillOpacity:route.id===selectedId?1:.7}} eventHandlers={{click:()=>{onSelect(route.id);onCheckpoint(c)}}}><Popup><strong>{route.name} · Mile {c.mile.toFixed(1)}</strong><br/>{c.risk.level}<br/>ETA {tripDate(c.eta,zone)} {tripTime(c.eta,zone)}<br/>Wind {c.weather.wind_mph.toFixed(1)} mph · gust {c.weather.gust_mph.toFixed(1)} mph<br/>Rain {c.weather.rain_in.toFixed(2)} in/hr · Snow {c.weather.snow_in.toFixed(2)} in/hr</Popup></CircleMarker>)}
-    {[plan.origin,plan.destination].map((place,i)=>{const checkpoint=selected?.checkpoints[i?selected.checkpoints.length-1:0];return <CircleMarker key={i} center={[place.lat,place.lon]} radius={9} pathOptions={{color:checkpoint&&checkpoint.risk.score>=2?COLORS[checkpoint.risk.score]:'white',weight:3,fillColor:i?'#172f29':'#2454b0',fillOpacity:1}} eventHandlers={{click:()=>{if(checkpoint)onCheckpoint(checkpoint)}}}><Popup><strong>{i?'Destination':'Origin'}</strong><br/>{place.label}{checkpoint&&<><br/>{checkpoint.risk.level} · {tripTime(checkpoint.eta,zone)}</>}</Popup></CircleMarker>})}
+    {visible&&checkpoints.filter(({c})=>c.id!==checkpoint?.id).map(({route,c})=><CircleMarker key={`${route.id}-${c.id}`} center={[c.lat,c.lon]} radius={route.id===selectedId?3.8:2} pathOptions={{color:'white',weight:1.1,fillColor:COLORS[c.risk.score],fillOpacity:route.id===selectedId?1:.7}} eventHandlers={{click:()=>{onSelect(route.id);onCheckpoint(c)}}}/>)}
+    {[plan.origin,plan.destination].map((place,i)=>{const endpoint=selected?.checkpoints[i?selected.checkpoints.length-1:0];return <Marker key={i} position={[place.lat,place.lon]} icon={L.divIcon({className:'endpoint-marker',iconSize:[22,32],iconAnchor:[11,32],html:`<span aria-hidden="true" style="border-color: ${endpoint&&endpoint.risk.score>=2?COLORS[endpoint.risk.score]:'#fff'}"><b>${i?'B':'A'}</b></span>`})} title={`${i?'Destination':'Origin'}: ${place.label}`} eventHandlers={{click:()=>{if(endpoint)onCheckpoint(endpoint)}}}/>})}
+    {checkpoint&&selected&&<><CircleMarker center={[checkpoint.lat,checkpoint.lon]} radius={9} pathOptions={{color:'#183b67',weight:3,fillColor:COLORS[checkpoint.risk.score],fillOpacity:1}} interactive={false}/><Popup ref={popup} position={[checkpoint.lat,checkpoint.lon]} className="checkpoint-popup" minWidth={240} maxWidth={290} autoPanPadding={[24,24]} eventHandlers={{remove:()=>onCheckpoint(null)}}><CheckpointDetails checkpoint={checkpoint} route={selected} zone={zone}/></Popup></>}
   </Pane>
 })
-export const RouteMap=memo(function RouteMap({plan,selectedId,onSelect,hour,showHeat,showCheckpoints,fitKey,onCheckpoint}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void;hour:number;showHeat:boolean;showCheckpoints:boolean;fitKey:number;onCheckpoint:(c:Checkpoint)=>void}) {
-  return <MapContainer center={[33.8,-115.1]} zoom={6} zoomControl={false} className="route-map" preferCanvas><TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'/><FitRoutes plan={plan} fitKey={fitKey}/><Heatmap plan={plan} hour={Math.floor(hour)} visible={showHeat}/><RoadLayers plan={plan} selectedId={selectedId} onSelect={onSelect}/><CheckpointLayers plan={plan} selectedId={selectedId} onSelect={onSelect} onCheckpoint={onCheckpoint} visible={showCheckpoints}/><JourneyMarker plan={plan} selectedId={selectedId} hour={hour}/><MapControls/></MapContainer>
+export const RouteMap=memo(function RouteMap({plan,selectedId,onSelect,hour,showHeat,showCheckpoints,checkpoint,onCheckpoint}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void;hour:number;showHeat:boolean;showCheckpoints:boolean;checkpoint:Checkpoint|null;onCheckpoint:(c:Checkpoint|null)=>void}) {
+  const [fitKey,setFitKey]=useState(0)
+  return <MapContainer center={[33.8,-115.1]} zoom={6} zoomControl={false} className="route-map" preferCanvas><TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'/><FitRoutes plan={plan} fitKey={fitKey}/><Heatmap plan={plan} hour={Math.floor(hour)} visible={showHeat}/><RoadLayers plan={plan} selectedId={selectedId} onSelect={onSelect}/><CheckpointLayers plan={plan} selectedId={selectedId} onSelect={onSelect} onCheckpoint={onCheckpoint} visible={showCheckpoints} checkpoint={checkpoint}/><JourneyMarker plan={plan} selectedId={selectedId} hour={hour}/><MapControls onFit={()=>{onCheckpoint(null);setFitKey(key=>key+1)}}/></MapContainer>
 })
-const MapControls=memo(function MapControls(){const map=useMap();return <div className="map-zoom" onPointerDown={e=>e.stopPropagation()}><button aria-label="Zoom in" onClick={()=>map.zoomIn()}>+</button><button aria-label="Zoom out" onClick={()=>map.zoomOut()}>−</button></div>})
+const MapControls=memo(function MapControls({onFit}:{onFit:()=>void}){const map=useMap();return <div className="map-zoom" onPointerDown={e=>e.stopPropagation()}><button aria-label="Zoom in" onClick={()=>map.zoomIn()}>+</button><button aria-label="Zoom out" onClick={()=>map.zoomOut()}>−</button><button aria-label="Fit all routes to map" onClick={onFit}><Focus size={17}/></button></div>})

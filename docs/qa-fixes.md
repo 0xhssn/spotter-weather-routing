@@ -82,3 +82,19 @@ Verification: all 52 frontend tests, the typography guard and production build p
 Supersedes the earlier unchanged-result disabling rule. Compare remains available for valid inputs even when displayed live results match, so users can explicitly recheck a trip. Edited trip fields add an Update needed badge and amber button outline. Successful comparisons and reverted edits clear the badge; failures and edits made during an earlier request remain marked. Loading, retry cooldowns and invalid/incomplete inputs still prevent inappropriate submissions. The badge is visual while the button description explains the pending update to assistive technology; map/timeline controls do not mark inputs changed. Existing server caching and throttling still apply to repeat checks.
 
 Verification: all 52 frontend tests, the typography guard (85 token-based sizes) and production build pass. Updated regression cases cover repeat submissions, every changed/reverted trip field, successful and failed updates, edits during a request, display-only controls, validation and in-flight duplicate protection. Browser checks confirmed an unchanged live comparison can be repeated, clicking the badge submits the update and clears it, and desktop/390 px badges stay at 12 px without overlapping the label or causing overflow/contrast flags. No console errors were recorded.
+
+## Component and layout audit - November 2, 2026
+
+Implemented U1-U12 with a bordered trip summary, one prioritized status slot, inert stale results, recommendation-first cards, anchored checkpoint details, a bounded sticky-header table, grouped sources, full-height sidebar and consistent date/time formatting. Compare retains the user's newer repeat-check and update-badge behavior. No backend routing, weather or scoring logic changed. See [UI audit verification](ui-audit.md) for the finding-by-finding results and screenshot matrix.
+
+Verification: 61 frontend tests, 60 backend tests, typography guard and production build pass. Responsive state, loose-text, overflow, sidebar, checkpoint and table checks are documented with the screenshots.
+
+## Wide text, shorter playback and modal scrolling - November 2, 2026
+
+The assumptions paragraphs now use the full card width and wrap long content safely. Their former 85-character width cap left most of a large card unused. Browser measurements at 390, 1440, 1800, 2154 and 2560 px show no page or paragraph overflow.
+
+Supersedes the earlier four-seconds-per-trip-hour playback rate: the full selected preview now takes about 12 seconds, with position updates every 50 ms based on elapsed time. It still stops at exact arrival or the 48-hour forecast limit, pauses/resumes correctly and resets on route changes. The full weather slider is unchanged.
+
+How we compare locks both document and body scrolling while open, keeps the scrollbar gutter stable, and contains scrolling inside the dialog. Closing by Escape or backdrop click, or unmounting, restores the previous scroll styles and focus without scrolling the page. A desktop wheel test left the page at scrollTop 0 while the dialog scrolled to 235 px.
+
+Verification: 66 frontend regressions, typography guard and production build pass. New tests cover 12-second previews for one-hour, four-hour and 72-hour routes, the weather-horizon limit, and scroll-style cleanup on Escape, backdrop dismissal and unmount.

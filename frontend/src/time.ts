@@ -22,6 +22,10 @@ export function tripTime(value:string, zone:string) {
 export function tripDate(value:string|Date, zone:string) {
   return new Date(Math.round(new Date(value).getTime()/60000)*60000).toLocaleDateString('en-US',{timeZone:zone,month:'short',day:'numeric'})
 }
+// Keep all result timestamps in the origin's time zone, including next-day arrivals.
+export function dateTime(value:string, zone:string) {
+  return `${tripDate(value,zone)}, ${tripTime(value,zone)}`
+}
 export function displayedArrival(departure:string, seconds:number) {
   return new Date(Math.round(new Date(departure).getTime()/60000)*60000+Math.round(seconds/60)*60000).toISOString()
 }

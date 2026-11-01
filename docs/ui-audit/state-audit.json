@@ -1,0 +1,407 @@
+[
+  {
+    "state": "example",
+    "cardRects": [
+      {
+        "width": 366,
+        "x": 12,
+        "y": 478.9453125
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 743.9375
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 1008.9296875
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 807,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 390,
+    "loose": []
+  },
+  {
+    "state": "example",
+    "cardRects": [
+      {
+        "width": 487,
+        "x": 263,
+        "y": 473.4140625
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 727.40625
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 981.3984375
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 768,
+    "loose": []
+  },
+  {
+    "state": "example",
+    "cardRects": [
+      {
+        "width": 292,
+        "x": 345,
+        "y": 368.078125
+      },
+      {
+        "width": 292,
+        "x": 649,
+        "y": 368.078125
+      },
+      {
+        "width": 292,
+        "x": 953,
+        "y": 368.078125
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 1280,
+    "loose": []
+  },
+  {
+    "state": "live",
+    "cardRects": [
+      {
+        "width": 366,
+        "x": 12,
+        "y": 419.9453125
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 684.9375
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 949.9296875
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 807,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 390,
+    "loose": []
+  },
+  {
+    "state": "live",
+    "cardRects": [
+      {
+        "width": 487,
+        "x": 263,
+        "y": 414.4140625
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 668.40625
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 922.3984375
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 768,
+    "loose": []
+  },
+  {
+    "state": "live",
+    "cardRects": [
+      {
+        "width": 292,
+        "x": 345,
+        "y": 327.078125
+      },
+      {
+        "width": 292,
+        "x": 649,
+        "y": 327.078125
+      },
+      {
+        "width": 292,
+        "x": 953,
+        "y": 327.078125
+      }
+    ],
+    "firstCard": "Route 3, recommended, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 1280,
+    "loose": []
+  },
+  {
+    "state": "loading",
+    "cardRects": [
+      {
+        "width": 366,
+        "x": 12,
+        "y": 287.5703125
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 552.5625
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 817.5546875
+      }
+    ],
+    "firstCard": "Route 3, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 780,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 390,
+    "loose": []
+  },
+  {
+    "state": "loading",
+    "cardRects": [
+      {
+        "width": 487,
+        "x": 263,
+        "y": 309.4921875
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 563.484375
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 817.4765625
+      }
+    ],
+    "firstCard": "Route 3, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 768,
+    "loose": []
+  },
+  {
+    "state": "loading",
+    "cardRects": [
+      {
+        "width": 292,
+        "x": 345,
+        "y": 266.34375
+      },
+      {
+        "width": 292,
+        "x": 649,
+        "y": 266.34375
+      },
+      {
+        "width": 292,
+        "x": 953,
+        "y": 266.34375
+      }
+    ],
+    "firstCard": "Route 3, 7h 31m, 439 miles, High conditions, eligible",
+    "notices": 0,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 1280,
+    "loose": []
+  },
+  {
+    "state": "error",
+    "cardRects": [
+      {
+        "width": 366,
+        "x": 12,
+        "y": 405.90625
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 703.4921875
+      }
+    ],
+    "firstCard": "Route 1, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 780,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 390,
+    "loose": []
+  },
+  {
+    "state": "error",
+    "cardRects": [
+      {
+        "width": 487,
+        "x": 263,
+        "y": 427.828125
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 714.4140625
+      }
+    ],
+    "firstCard": "Route 1, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 768,
+    "loose": []
+  },
+  {
+    "state": "error",
+    "cardRects": [
+      {
+        "width": 444,
+        "x": 345,
+        "y": 363.234375
+      },
+      {
+        "width": 444,
+        "x": 801,
+        "y": 363.234375
+      }
+    ],
+    "firstCard": "Route 1, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": false,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": true,
+    "width": 1280,
+    "loose": []
+  },
+  {
+    "state": "car-profile",
+    "cardRects": [
+      {
+        "width": 366,
+        "x": 12,
+        "y": 534.28125
+      },
+      {
+        "width": 366,
+        "x": 12,
+        "y": 831.8671875
+      }
+    ],
+    "firstCard": "Route 1, recommended, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 807,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 390,
+    "loose": []
+  },
+  {
+    "state": "car-profile",
+    "cardRects": [
+      {
+        "width": 487,
+        "x": 263,
+        "y": 528.75
+      },
+      {
+        "width": 487,
+        "x": 263,
+        "y": 815.3359375
+      }
+    ],
+    "firstCard": "Route 1, recommended, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 768,
+    "loose": []
+  },
+  {
+    "state": "car-profile",
+    "cardRects": [
+      {
+        "width": 444,
+        "x": 345,
+        "y": 419.96875
+      },
+      {
+        "width": 444,
+        "x": 801,
+        "y": 419.96875
+      }
+    ],
+    "firstCard": "Route 1, recommended, 25h 34m, 374 miles, High conditions, eligible",
+    "notices": 1,
+    "overflow": false,
+    "recommendation": true,
+    "sidebarHeight": 900,
+    "sidebarScroll": 0,
+    "stale": false,
+    "width": 1280,
+    "loose": []
+  }
+]
