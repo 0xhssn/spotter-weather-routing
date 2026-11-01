@@ -98,3 +98,9 @@ Supersedes the earlier four-seconds-per-trip-hour playback rate: the full select
 How we compare locks both document and body scrolling while open, keeps the scrollbar gutter stable, and contains scrolling inside the dialog. Closing by Escape or backdrop click, or unmounting, restores the previous scroll styles and focus without scrolling the page. A desktop wheel test left the page at scrollTop 0 while the dialog scrolled to 235 px.
 
 Verification: 66 frontend regressions, typography guard and production build pass. New tests cover 12-second previews for one-hour, four-hour and 72-hour routes, the weather-horizon limit, and scroll-style cleanup on Escape, backdrop dismissal and unmount.
+
+## Forecast-only playback - November 2, 2026
+
+Supersedes the moving position marker, trip-progress panel and arrival-stop behavior described above. Removed the marker, tooltip, progress display, interpolation helper and their unused styles. The timeline now plays the full 48-hour weather window in about 12 seconds for every route, regardless of its arrival time. Pause, scrubbing, replay and route/new-plan reset remain available. Routing, checkpoint arrival times and risk scoring are unchanged.
+
+Verification: all 59 remaining frontend tests, the typography guard and production build pass. The browser reached hour 48 with Replay available, zero moving-position markers, zero trip-progress panels, no page overflow and no console warnings/errors. Removed feature-specific tests were replaced with full-window playback regressions for one-hour, four-hour and 72-hour routes.

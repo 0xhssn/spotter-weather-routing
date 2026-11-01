@@ -4,7 +4,7 @@ Implemented U1-U12 from the November 1 UI audit. This changes layout, interactio
 
 | Finding | Result |
 | --- | --- |
-| U1-U2: detached and repeated copy | A trip summary, map footer, collapsible checkpoint card and Assumptions and sources card contain all supporting information. Timeline help appears once below the map; details live in How we compare. The full preview takes about 12 seconds. Removed the loose footer and taglines. Assumptions text uses the full card width with safe wrapping. |
+| U1-U2: detached and repeated copy | A trip summary, map footer, collapsible checkpoint card and Assumptions and sources card contain all supporting information. Timeline help appears once below the map; details live in How we compare. The full 48-hour weather playback takes about 12 seconds, independent of route duration. Removed the loose footer and taglines. Assumptions text uses the full card width with safe wrapping. |
 | U3: stacked notices and stale results | One status slot prioritizes error, changed inputs, car caveat and other provider notes. Additional notes use a disclosure. Previous results are dimmed and inert after edits or any failed comparison, with no recommendation banner or recommended card badges. Loading uses the button and one results overlay. Truck-distance errors offer a Turn on action for the labelled car opt-in; application-wide distance limits retain their original message. |
 | U4-U5: page chrome | One bordered trip summary contains cities, departure, load, checkpoint spacing, data source and the single methodology action. Removed the breadcrumb, account avatar, nonfunctional compass and marketing copy. |
 | U6: sidebar | The sidebar sticks at top 0 with height 100dvh, without the old 76 px subtraction. Short viewport spacing keeps the form readable; the removed footnote cannot clip. |
@@ -17,11 +17,11 @@ Implemented U1-U12 from the November 1 UI audit. This changes layout, interactio
 
 ## Verification
 
-- 66 frontend regressions pass, covering status priority, inactive stale results, unchanged-input failures, truck-distance recovery, loading, dialog focus/Escape and scroll cleanup, next-day dates, checkpoint units/selection, example reset/in-flight edit preservation and 12-second previews.
+- 59 frontend regressions pass, covering status priority, inactive stale results, unchanged-input failures, truck-distance recovery, loading, dialog focus/Escape and scroll cleanup, next-day dates, checkpoint units/selection, example reset/in-flight edit preservation and full-window forecast playback.
 - 60 backend regressions pass. TypeScript, the production build and the typography guard pass.
 - A separate live LA-Phoenix smoke test against the normal backend succeeded with three routes and no browser warnings/errors. [Real-provider desktop preview](ui-audit/live-smoke-1280.jpg).
 - Example, loading, live-style, error-over-stale-car and car-estimate layouts checked at 390, 768 and 1280 px. The component audit returns `[]` in every state, and none has page overflow. There is at most one status slot; loading has none. Old results are inert and unrecommended during loading and after errors.
-- Additional checks cover 1024 px card alignment, 800/1043 px sidebar heights while scrolling, sticky table headers/internal scrolling, checkpoint popup selection/resizing, modal focus, position details and route/timeline reset. Steady-state typography audits at 390, 768, 1024 and 1280 px found no small-text, contrast or clipping flags. At 800 px the sidebar has 8 px of internal scroll but all form text fits; at 1043 px it has no internal scroll.
+- Additional checks cover 1024 px card alignment, 800/1043 px sidebar heights while scrolling, sticky table headers/internal scrolling, checkpoint popup selection/resizing, modal focus, forecast controls and route/timeline reset. Steady-state typography audits at 390, 768, 1024 and 1280 px found no small-text, contrast or clipping flags. At 800 px the sidebar has 8 px of internal scroll but all form text fits; at 1043 px it has no internal scroll.
 
 The screenshot matrix below uses a separate, temporary local fixture API on port 8102 and frontend on 5174. Its live-style, car, delay and error responses are **synthetic visual QA states**, not evidence of current provider weather or real car routes. The normal application on 5173 continues to use the backend on 8000. No fixture server or override is part of the application or deployment.
 
@@ -34,3 +34,7 @@ The screenshot matrix below uses a separate, temporary local fixture API on port
 | Car estimate fixture | [Phone](ui-audit/car-profile-390.jpg) | [Tablet](ui-audit/car-profile-768.jpg) | [Desktop](ui-audit/car-profile-1280.jpg) |
 
 To repeat the checks, run `npm test` and `npm run build` in frontend, and `../.venv/bin/python manage.py test` in backend. The read-only console scripts in `frontend/scripts/audit-components.js` and `audit-typography.js` check loose component text and typography. Browser sizes are desktop emulations; physical phone/tablet testing remains a manual check.
+
+## Latest interaction change
+
+The moving vehicle/position marker and trip-progress display were removed at the user's request. Forecast playback now continues through all 48 hours without pausing at trip arrival, and still completes in about 12 seconds. The earlier screenshots preserve the audited layout at that point in time; [the current forecast view](ui-audit/forecast-only.jpg) shows the simplified map and timeline.

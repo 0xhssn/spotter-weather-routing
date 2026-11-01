@@ -1,114 +1,95 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ForecastPanel } from './ForecastPanel'
 import type { Plan } from './types'
 
-vi.mock('./RouteMap',()=>({RouteMap:()=>null}))
+vi.mock('./RouteMap',()=>({RouteMap:({hour}:{hour:number})=><output aria-label="Map forecast hour">{hour}</output>}))
 const plan={departure:'2026-11-01T16:00:00Z',origin:{timezone:'America/Los_Angeles'},routes:[
-  {id:'a',name:'Route A',distance_miles:100,duration_s:14400,geometry:{coordinates:[[0,0],[1,0],[1,1]]},geometry_progress:[[0,0],[20,10800],[100,14400]],summary:{eligible:true}},
-  {id:'b',name:'Route B',routing_profile:'car',distance_miles:80,duration_s:3600,geometry:{coordinates:[[0,0],[2,0]]},geometry_progress:[[0,0],[80,3600]],summary:{eligible:false}},
+  {id:'a',name:'Route A',duration_s:14400},
+  {id:'b',name:'Route B',duration_s:3600},
 ]} as Plan
 const props={plan,selectedId:'a',onSelect:vi.fn(),checkpoint:null,onCheckpoint:vi.fn(),busy:false}
+const hour=()=>Number((screen.getByRole('slider') as HTMLInputElement).value)
 afterEach(()=>vi.useRealTimers())
 
-it('resets progress and the forecast hour to departure when switching routes',()=>{
+it('resets the forecast hour and pauses when switching routes',()=>{
+  vi.useFakeTimers()
   const {rerender}=render(<ForecastPanel {...props}/>)
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('At departure · 0 mi')
-  fireEvent.change(screen.getByRole('slider'),{target:{value:'2'}})
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('13.3 mi traveled · 86.7 mi remaining')
+  fireEvent.change(screen.getByRole('slider'),{target:{value:'12'}})
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
+  act(()=>vi.advanceTimersByTime(100))
+  expect(hour()).toBeGreaterThan(12)
   rerender(<ForecastPanel {...props} selectedId="b"/>)
-  const progress=screen.getByLabelText('Estimated route progress')
-  expect(progress).toHaveTextContent('Estimated car position · Route B')
-  expect(progress).toHaveTextContent('At departure · 0 mi')
-  expect(progress).toHaveTextContent('No Travel — route excluded. Position preview only.')
-  expect(screen.getByRole('slider')).toHaveValue('0')
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(hour()).toBe(0)
+  expect(screen.getByRole('button',{name:'Play forecast'})).toBeInTheDocument()
 })
 
-it('moves progress with play and stops changing it after pause',()=>{
+it('advances weather with play, pauses, and resumes from the current hour',()=>{
   vi.useFakeTimers()
   render(<ForecastPanel {...props}/>)
-  fireEvent.click(screen.getByRole('button',{name:'Play trip preview'}))
-  act(()=>vi.advanceTimersByTime(100))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBeCloseTo(4/120,10)
-  expect(within(screen.getByLabelText('Estimated route progress')).getByText(/mi traveled/)).toHaveTextContent('0.2 mi traveled')
-  fireEvent.click(screen.getByRole('button',{name:'Pause trip preview'}))
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
   act(()=>vi.advanceTimersByTime(1000))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBeCloseTo(4/120,10)
-})
-
-it('resets progress to departure when a new plan is loaded',()=>{
-  const {rerender}=render(<ForecastPanel {...props}/>)
-  fireEvent.change(screen.getByRole('slider'),{target:{value:'48'}})
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('Arrived · 100 mi')
-  rerender(<ForecastPanel {...props} plan={{...plan,departure:'2026-11-02T16:00:00Z'}}/>)
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('At departure · 0 mi')
-})
-
-it('pauses at exact arrival, explains the remaining weather horizon, and can replay',()=>{
-  vi.useFakeTimers()
-  const shortPlan={...plan,routes:[{...plan.routes[0],duration_s:4501,geometry_progress:[[0,0],[20,3600],[100,4501]] as [number,number][]}]}
-  render(<ForecastPanel {...props} plan={shortPlan}/>)
-  fireEvent.change(screen.getByRole('slider'),{target:{value:'1.24'}})
-  fireEvent.click(screen.getByRole('button',{name:'Play trip preview'}))
-  act(()=>vi.advanceTimersByTime(100))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBeCloseTo(4501/3600,10)
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('Arrived · 100 mi')
-  expect(screen.getByRole('status')).toHaveTextContent('Trip completed. Move the slider to inspect corridor weather after arrival.')
+  expect(hour()).toBe(4)
+  expect(screen.getByLabelText('Map forecast hour')).toHaveTextContent('4')
+  fireEvent.click(screen.getByRole('button',{name:'Pause forecast'}))
   act(()=>vi.advanceTimersByTime(2000))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBeCloseTo(4501/3600,10)
-  fireEvent.click(screen.getByRole('button',{name:'Replay trip preview'}))
-  expect(screen.getByRole('slider')).toHaveValue('0')
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('At departure · 0 mi')
+  expect(hour()).toBe(4)
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(hour()).toBe(8)
 })
 
-it('keeps the full 48-hour forecast available when a shorter trip has ended',()=>{
-  render(<ForecastPanel {...props}/>)
-  fireEvent.change(screen.getByRole('slider'),{target:{value:'48'}})
-  expect(screen.getByRole('slider')).toHaveAttribute('max','48')
-  expect(screen.getByRole('slider')).toHaveValue('48')
-  expect(screen.getByRole('status')).toHaveTextContent('Move the slider to inspect corridor weather after arrival.')
-  expect(screen.getByLabelText('Estimated route progress')).toHaveTextContent('Arrived · 100 mi')
-})
-
-it('ends a long-trip preview at 48 hours without claiming the vehicle has arrived',()=>{
-  vi.useFakeTimers()
-  const longPlan={...plan,trip_exceeds_heatmap:true,routes:[{...plan.routes[0],duration_s:72*3600,geometry_progress:[[0,0],[20,36*3600],[100,72*3600]] as [number,number][]}]}
-  render(<ForecastPanel {...props} plan={longPlan}/>)
-  fireEvent.change(screen.getByRole('slider'),{target:{value:'47.99'}})
-  fireEvent.click(screen.getByRole('button',{name:'Play trip preview'}))
-  act(()=>vi.advanceTimersByTime(100))
-  expect(screen.getByRole('slider')).toHaveValue('48')
-  expect(screen.getByRole('button',{name:'Replay trip preview'})).toBeInTheDocument()
-  expect(screen.getByLabelText('Estimated route progress')).not.toHaveTextContent('Arrived')
-  expect(screen.getByText(/The corridor timeline shows the first 48 hours/)).toBeInTheDocument()
-})
-
-it('resets and pauses playback when changing routes',()=>{
+it('resets and pauses when a new plan is loaded',()=>{
   vi.useFakeTimers()
   const {rerender}=render(<ForecastPanel {...props}/>)
-  fireEvent.click(screen.getByRole('button',{name:'Play trip preview'}))
-  act(()=>vi.advanceTimersByTime(100))
-  rerender(<ForecastPanel {...props} selectedId="b"/>)
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
   act(()=>vi.advanceTimersByTime(1000))
-  expect(screen.getByRole('slider')).toHaveValue('0')
-  expect(screen.getByRole('button',{name:'Play trip preview'})).toBeInTheDocument()
+  rerender(<ForecastPanel {...props} plan={{...plan,departure:'2026-11-02T16:00:00Z'}}/>)
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(hour()).toBe(0)
+  expect(screen.getByRole('button',{name:'Play forecast'})).toBeInTheDocument()
 })
 
-it.each([3600,14400,72*3600])('finishes the %s-second route preview in 12 seconds without skipping arrival or the horizon',duration=>{
+it('pauses animation when the user scrubs the full weather window',()=>{
   vi.useFakeTimers()
-  const previewPlan={...plan,trip_exceeds_heatmap:duration>48*3600,routes:[{...plan.routes[0],duration_s:duration,geometry:{...plan.routes[0].geometry,coordinates:[[0,0],[1,1]] as [number,number][]},geometry_progress:[[0,0],[100,duration]] as [number,number][]}]}
-  const end=Math.min(48,duration/3600)
-  render(<ForecastPanel {...props} plan={previewPlan}/>)
-  fireEvent.click(screen.getByRole('button',{name:'Play trip preview'}))
+  render(<ForecastPanel {...props}/>)
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
+  act(()=>vi.advanceTimersByTime(1000))
+  fireEvent.change(screen.getByRole('slider'),{target:{value:'36'}})
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(hour()).toBe(36)
+  expect(screen.getByRole('slider')).toHaveAttribute('max','48')
+  expect(screen.getByRole('slider')).toHaveAttribute('aria-valuetext',expect.stringContaining('+36 hours'))
+  expect(screen.getByRole('button',{name:'Play forecast'})).toBeInTheDocument()
+})
+
+it('pauses and disables playback while a comparison is in progress',()=>{
+  vi.useFakeTimers()
+  const {rerender}=render(<ForecastPanel {...props}/>)
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
+  act(()=>vi.advanceTimersByTime(1000))
+  rerender(<ForecastPanel {...props} busy/>)
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(hour()).toBe(4)
+  expect(screen.getByRole('button',{name:'Play forecast'})).toBeDisabled()
+})
+
+it.each([3600,14400,72*3600])('plays every forecast hour in 12 seconds for a %s-second route',duration=>{
+  vi.useFakeTimers()
+  render(<ForecastPanel {...props} plan={{...plan,routes:[{...plan.routes[0],duration_s:duration}],trip_exceeds_heatmap:duration>48*3600}}/>)
+  expect(screen.queryByLabelText('Estimated route progress')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
   act(()=>vi.advanceTimersByTime(11950))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBeCloseTo(end*11950/12000,10)
-  expect(screen.getByRole('button',{name:'Pause trip preview'})).toBeInTheDocument()
+  expect(hour()).toBeCloseTo(47.8,10)
+  expect(screen.getByRole('button',{name:'Pause forecast'})).toBeInTheDocument()
   act(()=>vi.advanceTimersByTime(50))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBe(end)
-  expect(screen.getByRole('button',{name:'Replay trip preview'})).toBeInTheDocument()
-  const progress=screen.getByLabelText('Estimated route progress')
-  if(duration<=48*3600)expect(progress).toHaveTextContent('Arrived · 100 mi')
-  else expect(progress).toHaveTextContent('66.7 mi traveled · 33.3 mi remaining')
+  expect(hour()).toBe(48)
+  expect(screen.getByRole('button',{name:'Replay forecast'})).toBeInTheDocument()
   act(()=>vi.advanceTimersByTime(5000))
-  expect(Number((screen.getByRole('slider') as HTMLInputElement).value)).toBe(end)
+  expect(hour()).toBe(48)
+  fireEvent.click(screen.getByRole('button',{name:'Replay forecast'}))
+  expect(hour()).toBe(0)
+  act(()=>vi.advanceTimersByTime(100))
+  expect(hour()).toBeCloseTo(.4,10)
 })

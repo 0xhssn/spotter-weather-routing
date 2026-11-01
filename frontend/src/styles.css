@@ -1553,119 +1553,6 @@ td {
   gap: 0;
 }
 
-.journey-marker {
-  display: grid;
-  place-items: center;
-  background: #2454b0;
-  color: #fff;
-  border: 3px solid #fff;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px #2454b0, 0 2px 8px #173d7350;
-}
-
-/* This marker denotes estimated position, without implying a vehicle heading. */
-.journey-position-dot {
-  display: block;
-  width: 6px;
-  height: 6px;
-  background: #fff;
-  border-radius: 50%;
-}
-
-.journey-marker:focus-visible {
-  outline: 3px solid #2454b0;
-  outline-offset: 3px;
-}
-
-.journey-tooltip {
-  border: 1px solid #c4d1e4;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px #173d7320;
-  color: #304b6b;
-  font-family: inherit;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  text-align: left;
-  white-space: normal;
-  width: max-content;
-  max-width: 12rem;
-  padding: 8px 10px;
-}
-
-.journey-tooltip strong {
-  display: block;
-  color: #183b67;
-  font-size: var(--text-sm);
-}
-
-.journey-tooltip-detail {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-primary);
-}
-
-.journey-tooltip-warning {
-  display: block;
-  margin-top: 4px;
-  color: var(--risk-text-no-travel);
-  font-weight: 600;
-}
-
-.journey-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-top: 1px solid #e5eaf0;
-  padding: 11px 17px;
-  background: #f7f9fc;
-  color: #2454b0;
-}
-
-.journey-progress>svg {
-  flex-shrink: 0;
-}
-
-.journey-progress>div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.journey-progress strong {
-  font-size: var(--text-xs);
-  line-height: 1.5;
-}
-
-.journey-progress span {
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: #415a78;
-}
-
-.journey-progress small {
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--muted);
-  margin-left: auto;
-  max-width: 32ch;
-}
-
-@media (max-width:760px) {
-  .journey-progress {
-    flex-wrap: wrap;
-    padding: 11px 13px;
-    gap: 7px 9px;
-  }
-  .journey-progress small {
-    flex-basis: 100%;
-    max-width: none;
-    margin-left: 28px;
-  }
-  .journey-tooltip {
-    max-width: 165px;
-  }
-}
 
 .timeline-explanation {
   border-top: 1px solid #e5eaf0;
@@ -1772,17 +1659,11 @@ input::placeholder {
   color: var(--text-primary);
 }
 
-.route-map .journey-tooltip {
-  color: #304b6b;
-}
-
 .forecast-offset,
 .trip-meta,
 .route-main-stat,
 .route-average,
 .route-bottom,
-.journey-progress,
-.journey-tooltip,
 .checkpoint-table,
 .weather-values {
   font-variant-numeric: tabular-nums;
@@ -1946,8 +1827,6 @@ input::placeholder {
 .weather-values dd { margin: 2px 0 0; font-size: var(--text-sm); font-weight: 600; white-space: nowrap; color: var(--text-primary); }
 .checkpoint-why { border-top: 1px solid var(--border); padding-top: 8px; line-height: 1.6; }
 .checkpoint-why > strong { display: block; color: var(--text-primary); }
-.journey-progress { flex-wrap: wrap; }
-.journey-progress strong { display: block; }
 .timeline-explanation p { max-width: none; }
 .checkpoint-details { margin-top: 16px; overflow: hidden; }
 .checkpoint-toggle { width: 100%; display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; text-align: left; background: #fff; padding: 14px 16px; color: var(--text-primary); }
@@ -1983,7 +1862,6 @@ input::placeholder {
   .sidebar { height: auto; overflow: visible; }
   .long-trips { grid-column: 1 / -1; }
   .checkpoint-toggle > span { order: 3; flex-basis: 100%; }
-  .journey-progress strong { max-width: none; }
   .trip-summary-main > div { flex-basis: 100%; }
   .trip-summary .secondary-button { margin-left: auto; }
 }
