@@ -2,13 +2,15 @@
 
 Repository: [0xhssn/spotter-weather-routing](https://github.com/0xhssn/spotter-weather-routing) (private).
 
+Live assessment: [Waywise](https://waywise-gsei.onrender.com/) · [API health](https://waywise-api-8xlf.onrender.com/api/health). Hosted on Render from November 2, 2026. **Suspend the paid API by November 15, 2026 at 23:59 WITA (UTC+8)**, or earlier when review is complete. Shutdown is manual; this deployment does not automatically expire.
+
 A React + TypeScript and Django app that compares road routes using weather at each checkpoint's estimated arrival time, load-sensitive risk rules, and a preloaded 0–48 hour corridor forecast.
 
 ![Verified live route comparison](docs/preview.jpg)
 
 ## Run locally
 
-Requires Python 3.11+ and Node.js 22.12+.
+Requires Python 3.11+ and Node.js 22.12+ on the 22.x line, or Node.js 24+.
 
 ```sh
 cp .env.example .env
@@ -53,6 +55,8 @@ For another hosting provider, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_
 4. Set the static site's `VITE_API_BASE_URL` to the API's assigned **public HTTPS URL**, without `/api`, then save and rebuild the static site. Until that URL is available, use `https://setup.invalid` at the initial prompt. Both URL settings use `sync: false` so subsequent Blueprint syncs preserve dashboard values. Render rejects references to reference-valued environment variables, so no chained reference or assumed hostname is used. Vite embeds the public API address at build time. Django automatically permits its `RENDER_EXTERNAL_HOSTNAME`; Gunicorn listens on Render's assigned `PORT`. Render generates the Django secret.
 5. Confirm both deploys are healthy, open the frontend, load the example, search for a city and compare a live trip. Check `/api/health` on the API URL. The example must remain labeled; live failures must display an error. GitHub regression and container checks gate subsequent automatic deployments.
 6. **Record the actual deployment time and a shutdown deadline no later than 14 days afterward.** Suspend the paid API after review and verify its suspended state; optionally remove both services when no longer needed. An active paid API keeps billing. This Blueprint does not automatically expire, and disconnecting/deleting the Blueprint alone does not stop its services. The static site has no compute charge, but both sites share the workspace's bandwidth/build allowances.
+
+Current deployment: Blueprint `waywise-assessment`; static site `waywise` (`srv-dbjnv1u7bikc7382bbng`) and API `waywise-api` (`srv-dbjnv1u7bikc7382bbn0`). The URL settings are configured to the two live origins linked above. To stop compute billing, open [API Settings → Delete or suspend](https://dashboard.render.com/web/srv-dbjnv1u7bikc7382bbn0/settings#delete-or-suspend), choose **Suspend Web Service**, and verify **Suspended** status. Complete this by **November 15 at 23:59 WITA**, inside the 14-day limit from initial provisioning around November 2 at 02:06 WITA. Maintenance Mode does not stop the compute service.
 
 For local split-hosting checks, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_BASE_URL` to the backend origin, and add the exact frontend origin to the backend's `CORS_ALLOWED_ORIGINS`. Restart both servers after changing environment values. Leave the frontend value empty for normal local Vite/Nginx proxying. Cross-origin access is limited to `/api/`, GET/POST/OPTIONS and JSON content type; `Retry-After` remains readable for the UI countdown. No cross-origin credentials are used.
 
