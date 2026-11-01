@@ -913,7 +913,8 @@ input[type=datetime-local] {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  min-width: 11rem;
+  flex: 0 0 12rem;
+  min-width: 0;
 }
 
 .forecast-label strong {
@@ -956,7 +957,13 @@ input[type=datetime-local] {
   color: var(--muted);
   border-radius: 4px;
   padding: 6px;
-  min-width: 11ch;
+  width: 6.5rem;
+  min-width: 6.5rem;
+  flex: 0 0 6.5rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   text-align: center;
 }
 

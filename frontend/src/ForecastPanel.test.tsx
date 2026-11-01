@@ -93,3 +93,34 @@ it.each([3600,14400,72*3600])('plays every forecast hour in 12 seconds for a %s-
   act(()=>vi.advanceTimersByTime(100))
   expect(hour()).toBeCloseTo(.4,10)
 })
+
+
+it('always shows two-digit hours and minutes, including exact-hour boundaries',()=>{
+  render(<ForecastPanel {...props}/>)
+  const timer=screen.getByRole('timer')
+  expect(timer).toHaveTextContent('+00h 00m')
+  for(const [value,text] of [['1.5','+01h 30m'],['9.983333333333333','+09h 59m'],['10','+10h 00m'],['14','+14h 00m'],['47.9999','+48h 00m'],['48','+48h 00m']]){
+    fireEvent.change(screen.getByRole('slider'),{target:{value}})
+    expect(timer).toHaveTextContent(text)
+  }
+  expect(timer).toHaveAttribute('aria-label','Forecast offset: 48 hours, 0 minutes')
+  expect(timer).toHaveAttribute('aria-live','off')
+})
+
+it('keeps both units present throughout play, pause and replay',()=>{
+  vi.useFakeTimers()
+  render(<ForecastPanel {...props}/>)
+  const timer=screen.getByRole('timer')
+  fireEvent.click(screen.getByRole('button',{name:'Play forecast'}))
+  act(()=>vi.advanceTimersByTime(50))
+  expect(timer).toHaveTextContent('+00h 12m')
+  act(()=>vi.advanceTimersByTime(950))
+  expect(timer).toHaveTextContent('+04h 00m')
+  fireEvent.click(screen.getByRole('button',{name:'Pause forecast'}))
+  act(()=>vi.advanceTimersByTime(1000))
+  expect(timer).toHaveTextContent('+04h 00m')
+  fireEvent.change(screen.getByRole('slider'),{target:{value:'48'}})
+  expect(timer).toHaveTextContent('+48h 00m')
+  fireEvent.click(screen.getByRole('button',{name:'Replay forecast'}))
+  expect(timer).toHaveTextContent('+00h 00m')
+})
