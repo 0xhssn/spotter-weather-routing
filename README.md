@@ -48,13 +48,37 @@ For another hosting provider, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_
 [`render.yaml`](render.yaml) defines a **free React static site** (`waywise`) and **one paid Django Docker service** (`waywise-api`, 512 MB / 0.5 CPU). Keep the workspace on Hobby; this app needs no database, persistent disk or second paid instance. The [published API instance price](https://render.com/pricing) is $7/month and compute is [prorated by the second](https://render.com/docs/faq): about **$1.63 for 7 days or $3.27 for 14 days** using a 30-day month, before extra bandwidth/build usage and tax. These are estimates rather than prepaid weekly packages.
 
 1. In Render, create a Blueprint from the private `0xhssn/spotter-weather-routing` repository, branch `main`, using the root `render.yaml`. Grant repository access only to this assessment repository. Review that the frontend is a **Static Site**, the API has exactly **one 512 MB / 0.5 CPU paid instance**, and no other paid resources are listed.
-2. Render prompts for `CORS_ALLOWED_ORIGINS` on the API and `VITE_API_BASE_URL` on the static site. Both are public URL settings, not credentials. For `CORS_ALLOWED_ORIGINS`, enter the exact frontend origin if already assigned, such as `https://waywise-xxxx.onrender.com`, with no path. If Render has not assigned it yet, use `https://setup.invalid` temporarily; the browser API will intentionally remain inaccessible until step 3. Do not use a wildcard.
+2. Generate the reviewer password as described below and set the API's `DEMO_ACCESS_PASSWORD_SHA256` when Render prompts for it. Render also prompts for `CORS_ALLOWED_ORIGINS` on the API and `VITE_API_BASE_URL` on the static site. Both are public URL settings, not credentials. For `CORS_ALLOWED_ORIGINS`, enter the exact frontend origin if already assigned, such as `https://waywise-xxxx.onrender.com`, with no path. If Render has not assigned it yet, use `https://setup.invalid` temporarily; the browser API will intentionally remain inaccessible until step 3. Do not use a wildcard.
 3. When the frontend URL is assigned, set the API's `CORS_ALLOWED_ORIGINS` to that exact HTTPS origin in its Environment settings and save/redeploy. The Blueprint leaves this value under dashboard control on future syncs. Multiple approved frontend origins can be comma-separated.
 4. Set the static site's `VITE_API_BASE_URL` to the API's assigned **public HTTPS URL**, without `/api`, then save and rebuild the static site. Until that URL is available, use `https://setup.invalid` at the initial prompt. Both URL settings use `sync: false` so subsequent Blueprint syncs preserve dashboard values. Render rejects references to reference-valued environment variables, so no chained reference or assumed hostname is used. Vite embeds the public API address at build time. Django automatically permits its `RENDER_EXTERNAL_HOSTNAME`; Gunicorn listens on Render's assigned `PORT`. Render generates the Django secret.
-5. Confirm both deploys are healthy, open the frontend, load the example, search for a city and compare a live trip. Check `/api/health` on the API URL. The example must remain labeled; live failures must display an error. GitHub regression and container checks gate subsequent automatic deployments.
+5. Confirm both deploys are healthy, open the frontend, enter the shared password, load the example, search for a city and compare a live trip. Check `/api/health` on the API URL. The example must remain labeled; live failures must display an error. GitHub regression and container checks gate subsequent automatic deployments.
 6. **Record the actual deployment time and a shutdown deadline no later than 14 days afterward.** Suspend the paid API after review and verify its suspended state; optionally remove both services when no longer needed. An active paid API keeps billing. This Blueprint does not automatically expire, and disconnecting/deleting the Blueprint alone does not stop its services. The static site has no compute charge, but both sites share the workspace's bandwidth/build allowances.
 
-For local split-hosting checks, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_BASE_URL` to the backend origin, and add the exact frontend origin to the backend's `CORS_ALLOWED_ORIGINS`. Restart both servers after changing environment values. Leave the frontend value empty for normal local Vite/Nginx proxying. Cross-origin access is limited to `/api/`, GET/POST/OPTIONS and JSON content type; `Retry-After` remains readable for the UI countdown. No cross-origin credentials are used.
+For local split-hosting checks, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_BASE_URL` to the backend origin, and add the exact frontend origin to the backend's `CORS_ALLOWED_ORIGINS`. Restart both servers after changing environment values. Leave the frontend value empty for normal local Vite/Nginx proxying. Cross-origin access is limited to `/api/`, GET/POST/OPTIONS, JSON content type and the Authorization header; `Retry-After` remains readable for the UI countdown. No cross-origin cookies or browser-managed credentials are used.
+
+## Shared reviewer password
+
+The hosted demo uses one shared password, with no accounts, database or registration. The free static frontend displays a password screen before mounting the planner. Django enforces the password on every API request, including direct requests to its public Render URL, so bypassing the UI does not bypass authentication. The static HTML/JavaScript remains public and contains no secrets. `/api/health` and GET `/api/access` are public readiness/access-metadata endpoints; CORS preflights are public and never perform provider work.
+
+Generate the password locally:
+
+```sh
+python3 scripts/create_demo_password.py
+```
+
+This creates `.demo-access.json` with mode 600 and refuses to overwrite an existing file. Keep it private and out of Git. Set **only** its `password_sha256` value as the backend's `DEMO_ACCESS_PASSWORD_SHA256` environment variable, then redeploy the API. Share its `password` value privately with reviewers. Use the generated random 256-bit password; the SHA-256 verifier is intended for this high-entropy secret, not a human-chosen password. Never put either value in a `VITE_` variable, frontend bundle, URL, PR or Loom recording.
+
+Production (`DJANGO_DEBUG=false`) refuses to start without a valid verifier. The Render Blueprint prompts for it as an unsynced environment value. Local development can leave it empty; set it in the backend `.env` to test the gate locally. Restart the backend after any change. The browser sends the password in an Authorization Bearer header over **HTTPS** and holds it only in tab memory, with no local/session storage or auth cookies. Reloading or closing the tab requires re-entry. API responses use `Cache-Control: no-store`.
+
+To rotate access, generate a new file with `--output .demo-access-next.json`, update the backend verifier and redeploy. Old credentials stop working on subsequent API calls; the frontend returns to the password screen on HTTP 401. This gate reduces casual abuse; existing provider budgets and plan throttles remain, but it is not denial-of-service protection. Keep hosting protections and resource limits in place.
+
+For a protected local Compose stack, put the verifier in the environment file selected by `APP_ENV_FILE`. Check it with:
+
+```sh
+python3 scripts/docker_smoke.py --password-file .demo-access.json
+```
+
+The smoke test verifies rejection of missing/wrong credentials on login, geocoding, example and planning endpoints, plus successful authenticated access. It reads the password from the private file rather than command-line arguments. Container CI generates its own ephemeral password and uses the same checks. Avoid logging request headers or passwords. Health checks remain usable without credentials.
 
 ## Features
 

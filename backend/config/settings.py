@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -15,7 +16,7 @@ if render_hostname := os.getenv("RENDER_EXTERNAL_HOSTNAME"):
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 INSTALLED_APPS = ["corsheaders", "planner"]
-MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "django.middleware.gzip.GZipMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware"]
+MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "config.demo_access.DemoAccessMiddleware", "django.middleware.gzip.GZipMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware"]
 USE_TZ = True
 TIME_ZONE = "UTC"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -40,8 +41,16 @@ PLAN_RATE_LIMIT = 30
 CORS_ALLOWED_ORIGINS = [origin.strip().rstrip('/') for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if origin.strip()]
 CORS_URLS_REGEX = r'^/api/'
 CORS_ALLOW_METHODS = ('GET', 'POST', 'OPTIONS')
-CORS_ALLOW_HEADERS = ('content-type',)
+CORS_ALLOW_HEADERS = ('content-type', 'authorization')
 CORS_EXPOSE_HEADERS = ('Retry-After',)
 CORS_ALLOW_CREDENTIALS = False
 if os.getenv('RENDER') == 'true':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Generate a random password with scripts/create_demo_password.py. Store only its
+# verifier in the backend environment, never in the frontend bundle or Git.
+DEMO_ACCESS_PASSWORD_SHA256 = os.getenv('DEMO_ACCESS_PASSWORD_SHA256', '').strip().lower()
+if DEMO_ACCESS_PASSWORD_SHA256 and not re.fullmatch(r'[0-9a-f]{64}', DEMO_ACCESS_PASSWORD_SHA256):
+    raise RuntimeError('DEMO_ACCESS_PASSWORD_SHA256 must be a SHA-256 hex digest.')
+if not DEBUG and not DEMO_ACCESS_PASSWORD_SHA256:
+    raise RuntimeError('Set DEMO_ACCESS_PASSWORD_SHA256 before deploying the reviewer demo.')

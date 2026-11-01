@@ -6,3 +6,5 @@ dist
 .env.*
 .git
 .DS_Store
+
+.demo-access*.json
