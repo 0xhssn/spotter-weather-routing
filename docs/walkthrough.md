@@ -1,7 +1,7 @@
 # Loom walkthrough outline (5–10 minutes)
 
 1. **0:00–0:45 — Goal and stack.** A driver enters cities, departure, cargo weight, and checkpoint spacing. React/TypeScript UI, Django API, Valhalla truck routes, Open-Meteo forecasts. Explain the assumed semi dimensions and empty weight, origin-local departure and DST handling.
-2. **0:45–2:00 — Trip comparison.** Start with the clearly labeled example; compare three corridors, mileage, time, severe/high mileage bars. Explain why the recommended route can be longer.
+2. **0:45–2:00 — Trip comparison.** Start with empty city fields and the neutral map prompt. Select cities and compare live routes; use Load example scenario explicitly when showing the recorded three-corridor example. Compare mileage, time and severe/high mileage bars. Explain why the recommended route can be longer.
 3. **2:00–3:15 — Map and weather.** Select each route; inspect checkpoint ETA and weather. Open the checkpoint table, change the corridor slider, play animation, toggle layers, and fit the map. Explain that the slider does not change the arrival-aware recommendation.
 4. **3:15–4:15 — Live providers.** Search cities and run Compare live routes. Show a long-haul comparison with the explicit car-profile opt-in and explain the restriction/ETA caveat. If fewer than three viable options or a provider error occur, show the explicit state. Do not represent example weather as live.
 5. **4:15–5:30 — Correctness.** Show `risk.py`: maximum weather category, strict load overrides, blocked-route exclusion, distance weighting, lexicographic ranking. Show shared threshold choices and final partial interval.

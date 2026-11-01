@@ -1879,6 +1879,19 @@ input::placeholder {
   opacity: 1;
 }
 
+
+/* A neutral map and one prompt before a trip is selected. */
+.empty-planner { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: #e9ede3; }
+.empty-planner-map { height: clamp(28rem, calc(100dvh - 9rem), 48rem); }
+.empty-planner-map .leaflet-tile-pane { opacity: .65; }
+.empty-planner-prompt { position: absolute; z-index: 1; top: 2rem; left: 50%; transform: translateX(-50%); width: calc(100% - 2rem); max-width: 25rem; padding: 1.5rem; border: 1px solid var(--border); border-radius: 10px; background: #fff; box-shadow: 0 6px 24px #263b3510; text-align: center; }
+.empty-planner-prompt > svg { color: var(--green); margin-bottom: .75rem; }
+.empty-planner-prompt h1 { margin: 0 0 .5rem; font-size: var(--text-title); }
+.empty-planner-prompt p { margin: 0; color: var(--muted); font-size: var(--text-md); line-height: 1.5; }
+@media (max-width: 600px) {
+  .empty-planner-map { height: 24rem; }
+  .empty-planner-prompt { top: 1rem; padding: 1.25rem; }
+}
 /* Shared reviewer password; no account or registration flow. */
 .access-page { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; }
 .access-card { width: 100%; max-width: 28rem; padding: 2rem; border: 1px solid var(--border, #dce4df); border-radius: 1rem; background: white; }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownUp, ArrowRight, ChevronDown, FlaskConical, LoaderCircle, Navigation, Route as RouteIcon, Truck, X } from 'lucide-react'
+import { ArrowDownUp, ArrowRight, ChevronDown, FlaskConical, LoaderCircle, Navigation, Truck, X } from 'lucide-react'
 import { api, ApiError } from './api'
 import { PlaceSearch } from './PlaceSearch'
+import { EmptyPlanner } from './EmptyPlanner'
 import { ForecastPanel } from './ForecastPanel'
 import { CheckpointTable, Recommendation, RouteCard } from './TripResults'
 import { departureISO, localInput, originZone, zoneLabel } from './time'
@@ -10,13 +11,12 @@ import type { TripNote } from './TripOverview'
 
 import type { Checkpoint, Place, Plan } from './types'
 
-const LA:Place={label:'Los Angeles, California, US',lat:34.0522,lon:-118.2437,timezone:'America/Los_Angeles'}
-const PHX:Place={label:'Phoenix, Arizona, US',lat:33.4484,lon:-112.074,timezone:'America/Phoenix'}
-
 export default function App(){
-  const [origin,setOrigin]=useState<Place|null>(LA)
-  const [destination,setDestination]=useState<Place|null>(PHX)
-  const [departure,setDeparture]=useState(localInput(new Date(Date.now()+3600000),'America/Los_Angeles'))
+  const inputZone=useRef(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const locationEdits=useRef(0)
+  const [origin,setOrigin]=useState<Place|null>(null)
+  const [destination,setDestination]=useState<Place|null>(null)
+  const [departure,setDeparture]=useState(()=>localInput(new Date(Date.now()+3600000),inputZone.current))
   const [load,setLoad]=useState(20000)
   const [spacing,setSpacing]=useState(25)
   const [plan,setPlan]=useState<Plan|null>(null)
@@ -29,7 +29,6 @@ export default function App(){
   const [retryAfter,setRetryAfter]=useState(0)
   const [method,setMethod]=useState(false)
   const [tableOpen,setTableOpen]=useState(false)
-  const inputZone=useRef('America/Los_Angeles')
   if(origin?.timezone)inputZone.current=origin.timezone
   const currentInputs=useRef({origin,destination,departure,load,spacing,allowRoad})
   currentInputs.current={origin,destination,departure,load,spacing,allowRoad}
@@ -38,6 +37,7 @@ export default function App(){
   const apply=(data:Plan)=>{setPlan(data);setSelectedId(data.recommended_id||data.routes[0]?.id || '');setCheckpoint(null)}
   async function example(){
     const initialInputs=currentInputs.current
+    const initialLocationEdits=locationEdits.current
     request.current?.abort();const controller=new AbortController();request.current=controller
     const sequence=++requestSequence.current
     setBusy(true);setError('');setErrorCode('')
@@ -46,13 +46,13 @@ export default function App(){
       if(sequence!==requestSequence.current)return
       apply(data)
       const current=currentInputs.current
-      if(current.origin===initialInputs.origin && current.destination===initialInputs.destination && current.departure===initialInputs.departure && current.load===initialInputs.load && current.spacing===initialInputs.spacing && current.allowRoad===initialInputs.allowRoad){
-        setOrigin(LA);setDestination(PHX);setDeparture(localInput(data.departure,originZone(data.origin.timezone)));setAllowRoad(!!data.allow_road_fallback)
+      if(locationEdits.current===initialLocationEdits && current.origin===initialInputs.origin && current.destination===initialInputs.destination && current.departure===initialInputs.departure && current.load===initialInputs.load && current.spacing===initialInputs.spacing && current.allowRoad===initialInputs.allowRoad){
+        setOrigin(data.origin);setDestination(data.destination);setDeparture(localInput(data.departure,originZone(data.origin.timezone)));setAllowRoad(!!data.allow_road_fallback)
       }
     }catch(e){if(sequence===requestSequence.current && !controller.signal.aborted && e instanceof Error && e.name!=='AbortError'){setError(e.message);if(e instanceof ApiError){setRetryAfter(e.retryAfter);setErrorCode(e.code)}}}
     finally{if(sequence===requestSequence.current)setBusy(false)}
   }
-  useEffect(()=>{void example();return ()=>request.current?.abort()},[]) // Load the explicitly labeled example once.
+  useEffect(()=>()=>request.current?.abort(),[])
   useEffect(()=>{
     if(!retryAfter)return
     const timer=setTimeout(()=>setRetryAfter(v=>v-1),1000)
@@ -100,7 +100,9 @@ export default function App(){
   const resultZone=originZone(plan?.origin.timezone)
   let parsedDeparture='', departureZone=zone
   try {parsedDeparture=departureISO(departure,zone);departureZone=zoneLabel(parsedDeparture,zone)} catch { /* Validation message appears on submit. */ }
+  const changeDestination=(place:Place|null)=>{locationEdits.current++;setDestination(place)}
   const changeOrigin=(place:Place|null)=>{
+    locationEdits.current++
     if(place?.timezone && place.timezone!==zone && parsedDeparture)setDeparture(localInput(parsedDeparture,place.timezone))
     setOrigin(place)
   }
@@ -133,8 +135,8 @@ export default function App(){
       <aside className="sidebar">
         <div className="sidebar-title"><h2>Plan your trip</h2></div>
         <form onSubmit={compare}>
-          <div className="location-fields"><PlaceSearch label="Origin" value={origin} onChange={changeOrigin}/><button type="button" className="swap-button" aria-label="Swap origin and destination" disabled={!origin||!destination} onClick={()=>{changeOrigin(destination);setDestination(origin)}}><ArrowDownUp size={14}/></button><PlaceSearch label="Destination" value={destination} onChange={setDestination}/></div>
-          <label className="field-label" htmlFor="departure">Departure <span>At origin · {departureZone}</span></label><input id="departure" type="datetime-local" value={departure} min={localInput(new Date(),zone)} max={localInput(new Date(Date.now()+7*86400000),zone)} onChange={e=>setDeparture(e.target.value)} required/>
+          <div className="location-fields"><PlaceSearch label="Origin" value={origin} onChange={changeOrigin}/><button type="button" className="swap-button" aria-label="Swap origin and destination" disabled={!origin||!destination} onClick={()=>{changeOrigin(destination);setDestination(origin)}}><ArrowDownUp size={14}/></button><PlaceSearch label="Destination" value={destination} onChange={changeDestination}/></div>
+          <label className="field-label" htmlFor="departure">Departure <span>{origin ? `At origin · ${departureZone}` : 'Select an origin'}</span></label><input id="departure" type="datetime-local" value={departure} min={localInput(new Date(),zone)} max={localInput(new Date(Date.now()+7*86400000),zone)} onChange={e=>setDeparture(e.target.value)} required/>
           <div className="load-heading"><label htmlFor="load">Load weight</label><Truck size={15}/></div><div className="weight-input"><input id="load" type="number" min="0" max="100000" step="1" required value={load} onChange={e=>setLoad(Number(e.target.value))}/><span>lb</span></div>
           <div className="spacing-heading"><span id="spacing-label">Check weather every</span></div><div className="segmented" role="group" aria-labelledby="spacing-label">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} mi</button>)}</div>
           <fieldset className="long-trips"><legend>Long trips</legend><label className="fallback-option" htmlFor="allow-road"><input id="allow-road" type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)} aria-describedby="fallback-help"/>Allow car-profile comparison</label><p id="fallback-help" className="fallback-help">If the trip exceeds the truck router’s distance limit, compare car routes instead. Truck restrictions are not checked.</p></fieldset>
@@ -159,7 +161,7 @@ export default function App(){
           </div>
           <Assumptions plan={plan}/>
         </>}
-        {!plan && <div className="empty-state">{busy?<LoaderCircle size={32} className="spin"/>:<RouteIcon size={36}/>}<h3>{busy?'Preparing your route planner…':'Let’s find a clearer road.'}</h3><p>Choose your cities, departure, and load to compare routes.</p></div>}
+        {!plan && <EmptyPlanner busy={busy}/>}
       </main>
     </div>
     {method && <div className="modal-backdrop" onClick={()=>setMethod(false)}><section className="method-modal" role="dialog" aria-modal="true" aria-labelledby="method-title" onClick={e=>e.stopPropagation()}><button className="modal-close" aria-label="Close explanation" onClick={()=>setMethod(false)}><X size={20}/></button><span className="eyebrow">THE LOGIC BEHIND THE LINE</span><h2 id="method-title">A safety-first comparison.</h2><p>We sample the road every 10, 25, or 50 miles and match the forecast to your estimated arrival at each checkpoint.</p><ol><li>Exclude any route with <strong>No Travel</strong> conditions.</li><li>Prefer the fewest <strong>Severe miles</strong>.</li><li>Then the fewest <strong>High miles</strong>.</li><li>Then the lowest distance-weighted average risk.</li><li>Use travel time as the final tie-breaker.</li></ol><p>The forecast timeline plays the full 48-hour corridor weather window in about 12 seconds, with weather updated hourly. Playback is independent of trip duration. Route scores always use each checkpoint’s arrival time.</p><p>The worse of two checkpoint risks applies to the road between them. Overlapping rain and snow boundaries use the higher category.</p><div className="rules-table"><table><thead><tr><th>Risk</th><th>Wind mph</th><th>Rain in/hr</th><th>Snow in/hr</th></tr></thead><tbody>{[['Low','<25','<0.10','<0.5'],['Moderate','25–<35','0.10–<0.25','0.5–<1'],['High','35–<45','0.25–<0.50','1–<2'],['Severe','45–<55','0.50–1.00','2–3'],['No Travel','≥55','>1.00','>3']].map(row=><tr key={row[0]}>{row.map(c=><td key={c}>{c}</td>)}</tr>)}</tbody></table></div><p><strong>Load overrides:</strong> wind ≥45 mph with a load over 30,000 lb means No Travel. Wind ≥35 mph with a load over 40,000 lb is at least Severe.</p><small>Wind and temperature are interpolated at arrival. Rain, snow and gusts use the hour containing arrival without smoothing precipitation peaks. Wind rules use sustained speed; gusts are shown separately. Weather can change between checkpoints. This assessment app is planning support, not a certified truck navigation system.</small></section></div>}
