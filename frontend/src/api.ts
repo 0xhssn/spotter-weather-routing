@@ -6,7 +6,8 @@ export class ApiError extends Error {
 export async function api<T>(url:string, options?:RequestInit):Promise<T> {
   const timeout=AbortSignal.timeout(28000)
   let response:Response
-  try { response=await fetch(url,{...options,signal:options?.signal?AbortSignal.any([options.signal,timeout]):timeout}) }
+  const base=(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/,'')
+  try { response=await fetch(`${base}${url}`,{...options,signal:options?.signal?AbortSignal.any([options.signal,timeout]):timeout}) }
   catch(error){
     if(typeof error==='object' && error!==null && 'name' in error && error.name==='TimeoutError')throw new ApiError('The comparison timed out. Please try again shortly.',503,'client_timeout')
     throw error

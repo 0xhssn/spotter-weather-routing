@@ -3,12 +3,18 @@
 anyio==4.15.1
     # via httpx
 asgiref==3.13.0
-    # via django
+    # via
+    #   django
+    #   django-cors-headers
 certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
 django==5.2.18
+    # via
+    #   -r backend/requirements.in
+    #   django-cors-headers
+django-cors-headers==4.9.0
     # via -r backend/requirements.in
 gunicorn==23.0.0
     # via -r backend/requirements.in

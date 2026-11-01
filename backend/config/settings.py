@@ -10,10 +10,12 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "local-development-only-change-befor
 if not DEBUG and SECRET_KEY.startswith("local-development"):
     raise RuntimeError("Set a unique DJANGO_SECRET_KEY before deploying.")
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,backend,testserver").split(",")
+if render_hostname := os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(render_hostname)
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
-INSTALLED_APPS = ["planner"]
-MIDDLEWARE = ["django.middleware.security.SecurityMiddleware", "django.middleware.gzip.GZipMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware"]
+INSTALLED_APPS = ["corsheaders", "planner"]
+MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "django.middleware.gzip.GZipMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware"]
 USE_TZ = True
 TIME_ZONE = "UTC"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -33,3 +35,13 @@ X_FRAME_OPTIONS = "DENY"
 
 GEOCODING_COUNTRY = os.getenv("GEOCODING_COUNTRY", "US")
 PLAN_RATE_LIMIT = 30
+
+# The static frontend and API have separate origins on Render.
+CORS_ALLOWED_ORIGINS = [origin.strip().rstrip('/') for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if origin.strip()]
+CORS_URLS_REGEX = r'^/api/'
+CORS_ALLOW_METHODS = ('GET', 'POST', 'OPTIONS')
+CORS_ALLOW_HEADERS = ('content-type',)
+CORS_EXPOSE_HEADERS = ('Retry-After',)
+CORS_ALLOW_CREDENTIALS = False
+if os.getenv('RENDER') == 'true':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

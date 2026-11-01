@@ -1,0 +1,61 @@
+# One paid API instance; the React static site has no paid compute plan.
+# Configure the exact frontend origin when creating the Blueprint.
+services:
+  - type: web
+    name: waywise-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    numInstances: 1
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: localhost,127.0.0.1
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: ROUTING_CLIENT_ID
+        value: waywise-spotter-assessment
+      - key: PUBLIC_API_URL
+        fromService:
+          name: waywise-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+  - type: web
+    name: waywise
+    runtime: static
+    rootDir: frontend
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: waywise-api
+          type: web
+          envVarKey: PUBLIC_API_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

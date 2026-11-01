@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { api } from './api'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {vi.unstubAllGlobals();vi.unstubAllEnvs()})
 
 it('shows a useful service error when the reverse proxy returns HTML', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<h1>Bad Gateway</h1>', {status: 502})))
@@ -25,4 +25,17 @@ it('replaces browser timeout wording with an actionable message',async()=>{
 it('handles an empty JSON error response without exposing a JavaScript exception',async()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('null',{status:500})))
   await expect(api('/api/plan')).rejects.toThrow('The request could not be completed. Please try again.')
+})
+
+it.each(['', 'https://api.example.test', 'https://api.example.test/'])('uses the configured public API origin: %s',async base=>{
+  vi.stubEnv('VITE_API_BASE_URL',base)
+  const fetch=vi.fn().mockResolvedValue(new Response('{"status":"ok"}',{status:200}))
+  vi.stubGlobal('fetch',fetch)
+  await expect(api('/api/health?check=1')).resolves.toEqual({status:'ok'})
+  expect(fetch).toHaveBeenCalledWith(`${base.replace(/\/+$/,'')}/api/health?check=1`,expect.any(Object))
+})
+it('still validates plan data when using a separate API origin',async()=>{
+  vi.stubEnv('VITE_API_BASE_URL','https://api.example.test')
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('{}',{status:200})))
+  await expect(api('/api/example')).rejects.toMatchObject({code:'invalid_response'})
 })

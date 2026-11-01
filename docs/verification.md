@@ -66,3 +66,15 @@ See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expa
 - A real POST through the Dockerized Nginx/Gunicorn stack returned HTTP 200 with live Valhalla truck routing, three LA-Phoenix routes and 95 weather locations. All 68 backend regressions also pass inside the production image.
 - Added explicit frontend readiness, faster startup health checks, configurable environment-file/port inputs, localhost-only port binding, environment-file build exclusions and a GitHub Actions container-build/smoke job.
 - Temporary hosting uses prorated compute rather than a full-month workspace subscription. The README records estimated 7/14-day costs and an explicit teardown requirement; cloud resources have not been created.
+
+
+## Split Render deployment preparation - November 2, 2026
+
+- Added a schema-validated `render.yaml` for one free React static site and exactly one paid 512 MB / 0.5 CPU Django Docker instance, with health checks, generated secret, public API URL wiring and deployment after GitHub checks pass. No database or persistent disk is required.
+- Added a build-time `VITE_API_BASE_URL` while retaining same-origin local proxy defaults. Django uses an exact frontend-origin CORS allowlist restricted to API routes, JSON content type and GET/POST/OPTIONS, and exposes `Retry-After` for cooldowns. No cross-origin credentials are permitted.
+- Gunicorn honors Render's `PORT` and worker setting. Its printed production configuration was checked with `PORT=10000`, `WEB_CONCURRENCY=1`; the local Docker default still uses port 8000.
+- All **74 backend tests** and **86 frontend tests** pass, including cross-origin preflights, readable API errors, denied origins, retry headers, API base URL normalization and preserved response validation. Django checks, typography guard and TypeScript/Vite build pass.
+- Rebuilt and started both local production-mode containers; both healthy. Container smoke checks and all 74 backend tests inside the image pass.
+- Served a production React build on localhost:5174 against a separate production-mode Gunicorn API on localhost:8001 with an explicit origin allowlist. The browser successfully loaded the example and completed a live Valhalla/Open-Meteo comparison with three truck routes. This verifies browser CORS enforcement across distinct origins rather than relying only on a command-line HTTP check.
+- The README records exact deployment/wiring checks, estimated single-instance 7/14-day costs and a shutdown deadline within 14 days of actual deployment. The Blueprint does not automatically expire.
+- Render account sign-in is required before deployment can proceed. No hosted URLs, cloud resources or paid charges were created during local preparation.
