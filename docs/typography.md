@@ -8,7 +8,7 @@ Implemented the typography brief's T1–T8 presentation changes. Routing, weathe
 - Narrower layouts rearrange content instead of reducing text size. Route cards stack below 600 px and use available columns at larger widths. Forms stack on narrow phones, and the sidebar width scales with browser text size.
 - Recommended and How we compare retain visible text at every tested width. The main page title is the h1; the sidebar title is h2.
 - Darker secondary text, separate risk-text tokens, readable map attribution, opaque map control surfaces, longer readable tooltips, and paragraphs capped at 72ch.
-- Numeric cells align right. `tabular-nums` is requested, but the loaded DM Sans font does not supply tabular figures: at a 20 px root/17.5 px UI size, 1111 measured 21.84 px and 8888 measured 42.56 px. The supported fallback is right alignment plus a reserved timeline-label width. The label measured 90.28 px for +0h, +48h and +47h 31m, preventing width jumps.
+- Numeric cells align right. `tabular-nums` is requested, but the loaded DM Sans font does not supply tabular figures: at a 20 px root/17.5 px UI size, 1111 measured 21.84 px and 8888 measured 42.56 px. Other numeric cells use right alignment. The forecast offset now uses a monospace font, a fixed 6.5 rem box, and two-digit hours and minutes in the format `+00h 00m`. Both units stay visible at exact hours, and the timestamp column has a reserved width so playback does not resize the desktop slider.
 
 ## Browser checks
 
