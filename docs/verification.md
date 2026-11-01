@@ -84,3 +84,15 @@ See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expa
 
 - Verified the GitHub installation uses **Only select repositories**, with exactly `0xhssn/spotter-weather-routing`, after saving its scope.
 - Render's live Blueprint validator rejected the chained `PUBLIC_API_URL` environment reference, a semantic restriction not enforced by its JSON schema. Replaced that chain with dashboard-managed `VITE_API_BASE_URL` (`sync: false`), matching the existing exact-origin CORS setting. The two public URLs must be set to their actual assigned service origins before browser verification.
+
+
+## Hosted Render verification - November 2, 2026
+
+- Provisioned the `waywise-assessment` Blueprint from main. Render's final review listed one paid `0.5c-512mb` web service at $7/month and one static site, total $7/month prorated by the second. No database, persistent disk or additional paid instance was created.
+- Frontend: https://waywise-gsei.onrender.com/ (`srv-dbjnv1u7bikc7382bbng`). API: https://waywise-api-8xlf.onrender.com/ (`srv-dbjnv1u7bikc7382bbn0`). Both successfully deployed commit `9cf44a8`; the API health endpoint returns HTTP 200.
+- Set the static site's `VITE_API_BASE_URL` to the actual API origin and the API's `CORS_ALLOWED_ORIGINS` to the actual frontend origin. The Render form loads masked values asynchronously; the final values were entered only after loading, saved and rebuilt. HTTP checks confirm health and POST preflight allow the exact frontend origin; an unrelated origin receives no CORS permission.
+- Browser verification on the hosted HTTPS frontend: labeled example loads; a real LA-Phoenix comparison returns LIVE FORECAST with three distinct Valhalla truck routes and Open-Meteo weather; Seattle autocomplete returns choices and selecting Seattle updates the origin and enables comparison. The hosted browser console reported no errors or warnings.
+- GitHub's installation settings were reloaded after saving and confirmed **Only select repositories**, exactly `0xhssn/spotter-weather-routing`.
+- GitHub regression and container jobs passed for `9cf44a8`: [run 41334762633](https://github.com/0xhssn/spotter-weather-routing/actions/runs/41334762633).
+- Render's build audit flagged development-only Vitest/mocker/tinypool advisories; the production-only audit had zero findings. Updated Vitest to 4.1.12, removing the vulnerable older test-tool chain. A fresh install and all 86 frontend tests, typography guard and production build pass under Node 22. Production package versions are unchanged.
+- Provisioning began around **November 2, 2026 at 02:06 WITA (UTC+8)**. **Manual shutdown deadline: November 15, 2026 at 23:59 WITA**, or earlier after review. The README links the API's Settings → Suspend Web Service control. No automatic expiration or shutdown job is configured.

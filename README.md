@@ -2,13 +2,15 @@
 
 Repository: [0xhssn/spotter-weather-routing](https://github.com/0xhssn/spotter-weather-routing) (private).
 
+Live assessment: [Waywise](https://waywise-gsei.onrender.com/) · [API health](https://waywise-api-8xlf.onrender.com/api/health). Hosted on Render from November 2, 2026. **Suspend the paid API by November 15, 2026 at 23:59 WITA (UTC+8)**, or earlier when review is complete. Shutdown is manual; this deployment does not automatically expire.
+
 A React + TypeScript and Django app that compares road routes using weather at each checkpoint's estimated arrival time, load-sensitive risk rules, and a preloaded 0–48 hour corridor forecast.
 
 ![Verified live route comparison](docs/preview.jpg)
 
 ## Run locally
 
-Requires Python 3.11+ and Node.js 22.12+.
+Requires Python 3.11+ and Node.js 22.12+ on the 22.x line, or Node.js 24+.
 
 ```sh
 cp .env.example .env
@@ -54,6 +56,8 @@ For another hosting provider, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_
 5. Confirm both deploys are healthy, open the frontend, enter the shared password, load the example, search for a city and compare a live trip. Check `/api/health` on the API URL. The example must remain labeled; live failures must display an error. GitHub regression and container checks gate subsequent automatic deployments.
 6. **Record the actual deployment time and a shutdown deadline no later than 14 days afterward.** Suspend the paid API after review and verify its suspended state; optionally remove both services when no longer needed. An active paid API keeps billing. This Blueprint does not automatically expire, and disconnecting/deleting the Blueprint alone does not stop its services. The static site has no compute charge, but both sites share the workspace's bandwidth/build allowances.
 
+Current deployment: Blueprint `waywise-assessment`; static site `waywise` (`srv-dbjnv1u7bikc7382bbng`) and API `waywise-api` (`srv-dbjnv1u7bikc7382bbn0`). The URL settings are configured to the two live origins linked above. To stop compute billing, open [API Settings → Delete or suspend](https://dashboard.render.com/web/srv-dbjnv1u7bikc7382bbn0/settings#delete-or-suspend), choose **Suspend Web Service**, and verify **Suspended** status. Complete this by **November 15 at 23:59 WITA**, inside the 14-day limit from initial provisioning around November 2 at 02:06 WITA. Maintenance Mode does not stop the compute service.
+
 For local split-hosting checks, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_BASE_URL` to the backend origin, and add the exact frontend origin to the backend's `CORS_ALLOWED_ORIGINS`. Restart both servers after changing environment values. Leave the frontend value empty for normal local Vite/Nginx proxying. Cross-origin access is limited to `/api/`, GET/POST/OPTIONS, JSON content type and the Authorization header; `Retry-After` remains readable for the UI countdown. No cross-origin cookies or browser-managed credentials are used.
 
 ## Shared reviewer password
@@ -67,6 +71,8 @@ python3 scripts/create_demo_password.py
 ```
 
 This creates `.demo-access.json` with mode 600 and refuses to overwrite an existing file. Keep it private and out of Git. Set **only** its `password_sha256` value as the backend's `DEMO_ACCESS_PASSWORD_SHA256` environment variable, then redeploy the API. Share its `password` value privately with reviewers. Use the generated random 256-bit password; the SHA-256 verifier is intended for this high-entropy secret, not a human-chosen password. Never put either value in a `VITE_` variable, frontend bundle, URL, PR or Loom recording.
+
+For an **existing** Render Blueprint, manually add `DEMO_ACCESS_PASSWORD_SHA256` on the Django API's Environment page **before merging or deploying this change**. Render prompts for `sync: false` values only during initial Blueprint creation; later Blueprint syncs ignore newly added unsynced values. Save/redeploy the API configuration before merging. Do not add this value to the static site's environment.
 
 Production (`DJANGO_DEBUG=false`) refuses to start without a valid verifier. The Render Blueprint prompts for it as an unsynced environment value. Local development can leave it empty; set it in the backend `.env` to test the gate locally. Restart the backend after any change. The browser sends the password in an Authorization Bearer header over **HTTPS** and holds it only in tab memory, with no local/session storage or auth cookies. Reloading or closing the tab requires re-entry. API responses use `Cache-Control: no-store`.
 
