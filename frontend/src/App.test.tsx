@@ -16,7 +16,7 @@ vi.mock('./RouteMap', () => ({RouteMap: ({hour}:{hour:number}) => <div aria-labe
 function plan(blocked=false):Plan {
   const departure=new Date(Date.now()+3600000).toISOString()
   return {
-    mode:'example',origin:{label:'Los Angeles',lat:34.0522,lon:-118.2437},destination:{label:'Phoenix',lat:33.4484,lon:-112.074},
+    mode:'example',origin:{label:'Los Angeles',lat:34.0522,lon:-118.2437,timezone:'America/Los_Angeles'},destination:{label:'Phoenix',lat:33.4484,lon:-112.074,timezone:'America/Phoenix'},
     departure,load_lb:20000,spacing_miles:25,recommended_id:blocked?null:'route-1',heatmap:[],forecast_hours:48,
     forecast_locations:3,generated_at:departure,warnings:[],providers:{routing:'Valhalla'},
     routes:[1,2,3].map(i=>({id:`route-${i}`,name:`Route ${i}`,via:'Highway',distance_miles:50,duration_s:7200,arrival:departure,
@@ -26,6 +26,12 @@ function plan(blocked=false):Plan {
     })),
   }
 }
+function renderWithExample() {
+  const view=render(<App/>)
+  fireEvent.click(screen.getByRole('button',{name:'Load example scenario'}))
+  return view
+}
+
 beforeEach(() => {
   vi.mocked(api).mockReset()
   // Keep unrelated form tests out of the annual repeated DST hour.
@@ -35,7 +41,7 @@ afterEach(()=>vi.restoreAllMocks())
 
 it('shows all three route options and refuses to recommend when every route is blocked', async () => {
   vi.mocked(api).mockResolvedValueOnce(plan(true))
-  render(<App/>)
+  renderWithExample()
   expect(await screen.findByText('No route recommended — No Travel conditions')).toBeInTheDocument()
   const options=screen.getByRole('region',{name:'Route options'})
   expect(within(options).getAllByRole('button')).toHaveLength(3)
@@ -44,7 +50,7 @@ it('shows all three route options and refuses to recommend when every route is b
 
 it('updates the 0–48h heatmap without requesting or replacing arrival-based scores', async () => {
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   fireEvent.change(screen.getByRole('slider'),{target:{value:'48'}})
   expect(screen.getByLabelText('Map forecast hour')).toHaveTextContent('48')
@@ -54,7 +60,7 @@ it('updates the 0–48h heatmap without requesting or replacing arrival-based sc
 
 it('marks stale results and sends edited cargo and checkpoint spacing in the live request', async () => {
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'40001'}})
   fireEvent.click(screen.getByRole('button',{name:'10 mi'}))
@@ -73,7 +79,7 @@ it('marks stale results and sends edited cargo and checkpoint spacing in the liv
 
 it('slider ticks do not render cards, recommendation or the open checkpoint table', async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   fireEvent.click(screen.getByRole('button',{name:'Checkpoint details'}))
   const before={...renders}
@@ -84,7 +90,7 @@ it('slider ticks do not render cards, recommendation or the open checkpoint tabl
 
 it('sends origin-local departure and the explicit fallback opt-in', async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:'2026-11-03T17:00'}})
   fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/))
@@ -95,7 +101,7 @@ it('sends origin-local departure and the explicit fallback opt-in', async()=>{
 
 it('shows the server retry countdown when a new plan is throttled', async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   vi.mocked(api).mockRejectedValueOnce(new ApiError('Please wait 12 seconds.',429,'rate_limited',12))
   await act(async()=>fireEvent.submit(screen.getByRole('button',{name:'Compare live routes'}).closest('form')!))
@@ -104,10 +110,10 @@ it('shows the server retry countdown when a new plan is throttled', async()=>{
 })
 
 
-it('does not overwrite a city being typed while the initial example is loading',async()=>{
+it('does not overwrite a city being typed while an explicitly requested example is loading',async()=>{
   let resolve!:(value:Plan)=>void
   vi.mocked(api).mockImplementationOnce(()=>new Promise(done=>{resolve=done}))
-  render(<App/>)
+  renderWithExample()
   fireEvent.change(screen.getByRole('combobox',{name:'Origin'}),{target:{value:'Denver'}})
   await act(async()=>resolve(plan()))
   expect(screen.getByRole('combobox',{name:'Origin'})).toHaveValue('Denver')
@@ -117,7 +123,7 @@ it('does not overwrite a city being typed while the initial example is loading',
 async function showLivePlan() {
   const example=plan()
   vi.mocked(api).mockResolvedValueOnce(example)
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   const live={...example,mode:'live' as const}
   vi.mocked(api).mockResolvedValueOnce(live)
@@ -128,7 +134,7 @@ async function showLivePlan() {
 
 it('allows live and repeat checks while blocking duplicate in-flight submissions',async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   const button=screen.getByRole('button',{name:'Compare live routes'}),form=button.closest('form')!
   expect(button).toBeEnabled()
@@ -215,7 +221,7 @@ it('keeps edits made during an in-flight comparison eligible for another compari
 
 it('requires valid trip inputs and a selected city before enabling a new live comparison',async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   await screen.findByText('Route 1 is your lower-risk option')
   fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'-1'}})
   expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
@@ -300,7 +306,7 @@ it('shows one loading overlay and hides old notices and the recommendation durin
 
 it('keeps one methodology entry point with Escape dismissal and focus restoration',async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
-  render(<App/>)
+  renderWithExample()
   const trigger=await screen.findByRole('button',{name:'How we compare'})
   trigger.focus();fireEvent.click(trigger)
   expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal','true')
@@ -327,7 +333,7 @@ it('resets the car option when loading an example after a car comparison',async(
 it('preserves a car-option edit made while an example is loading',async()=>{
   let resolve!:(value:Plan)=>void
   vi.mocked(api).mockImplementationOnce(()=>new Promise(done=>{resolve=done}))
-  render(<App/>)
+  renderWithExample()
   fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/))
   await act(async()=>resolve(plan()))
   expect(screen.getByRole('checkbox',{name:'Allow car-profile comparison'})).toBeChecked()
@@ -338,7 +344,7 @@ it.each(['backdrop','unmount'])('restores existing page scrolling styles after m
   const bodyOverflow=document.body.style.overflow,pageOverflow=document.documentElement.style.overflow,gutter=document.documentElement.style.scrollbarGutter
   document.body.style.overflow='auto';document.documentElement.style.overflow='clip';document.documentElement.style.scrollbarGutter='auto'
   vi.mocked(api).mockResolvedValueOnce(plan())
-  const view=render(<App/>)
+  const view=renderWithExample()
   try{
     fireEvent.click(await screen.findByRole('button',{name:'How we compare'}))
     expect(document.body).toHaveStyle({overflow:'hidden'})
@@ -353,4 +359,67 @@ it.each(['backdrop','unmount'])('restores existing page scrolling styles after m
     view.unmount()
     document.body.style.overflow=bodyOverflow;document.documentElement.style.overflow=pageOverflow;document.documentElement.style.scrollbarGutter=gutter
   }
+})
+
+it('starts with empty city fields, a short map prompt and no automatic API requests',()=>{
+  render(<App/>)
+  expect(screen.getByRole('combobox',{name:'Origin'})).toHaveValue('')
+  expect(screen.getByRole('combobox',{name:'Destination'})).toHaveValue('')
+  expect(screen.getByRole('heading',{name:'Where are you headed?'})).toBeInTheDocument()
+  expect(screen.getByLabelText('Route planning map')).toBeInTheDocument()
+  expect(screen.getByText('Select an origin')).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Swap origin and destination'})).toBeDisabled()
+  expect(screen.queryByRole('region',{name:'Route options'})).not.toBeInTheDocument()
+  expect(screen.queryByText('EXAMPLE DATA')).not.toBeInTheDocument()
+  expect(api).not.toHaveBeenCalled()
+})
+
+it('can select both cities and make the first live comparison without loading an example',async()=>{
+  const origin={label:'Denver, Colorado, US',lat:39.7392,lon:-104.9903,timezone:'America/Denver'}
+  const destination={label:'Chicago, Illinois, US',lat:41.8781,lon:-87.6298,timezone:'America/Chicago'}
+  vi.mocked(api).mockImplementation(async(url,options)=>{
+    if(url.startsWith('/api/places'))return {results:[url.includes('Denver')?origin:destination]}
+    return {...plan(),mode:'live',origin,destination,departure:JSON.parse(options!.body as string).departure}
+  })
+  render(<App/>)
+  const initialDeparture=(screen.getByLabelText(/Departure/) as HTMLInputElement).value
+  expect(api).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByRole('combobox',{name:'Origin'}),{target:{value:'Denver'}})
+  fireEvent.click(await screen.findByRole('button',{name:origin.label}))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByText('At origin · MST')).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('combobox',{name:'Destination'}),{target:{value:'Chicago'}})
+  fireEvent.click(await screen.findByRole('button',{name:destination.label}))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
+  expect(screen.getByText('LIVE FORECAST')).toBeInTheDocument()
+  expect(screen.queryByRole('region',{name:'Start a trip'})).not.toBeInTheDocument()
+  const [url,options]=vi.mocked(api).mock.calls[2]
+  expect(url).toBe('/api/plan')
+  expect(JSON.parse(options!.body as string)).toMatchObject({origin,destination,departure:'2026-11-02T17:00:00Z'})
+  expect(initialDeparture).not.toBe('')
+  expect(vi.mocked(api).mock.calls.some(([url])=>url.startsWith('/api/example'))).toBe(false)
+})
+
+it('shows loading on the empty map and allows retry after the first comparison fails',async()=>{
+  const origin={label:'Los Angeles',lat:34.0522,lon:-118.2437,timezone:'America/Los_Angeles'}
+  const destination={label:'Phoenix',lat:33.4484,lon:-112.074,timezone:'America/Phoenix'}
+  let fail!:(reason:Error)=>void
+  vi.mocked(api).mockImplementation(async url=>{
+    if(url.startsWith('/api/places'))return {results:[url.includes('Los')?origin:destination]}
+    return new Promise((_,reject)=>{fail=reject})
+  })
+  render(<App/>)
+  fireEvent.change(screen.getByRole('combobox',{name:'Origin'}),{target:{value:'Los Angeles'}})
+  fireEvent.click(await screen.findByRole('button',{name:origin.label}))
+  fireEvent.change(screen.getByRole('combobox',{name:'Destination'}),{target:{value:'Phoenix'}})
+  fireEvent.click(await screen.findByRole('button',{name:destination.label}))
+  fireEvent.click(screen.getByRole('button',{name:'Compare live routes'}))
+  expect(screen.getByRole('status')).toHaveTextContent('Checking the road ahead')
+  expect(screen.getByRole('button',{name:'Comparing routes…'})).toBeDisabled()
+  await act(async()=>fail(new ApiError('Weather unavailable.',503,'provider_unavailable')))
+  expect(screen.getByRole('alert')).toHaveTextContent('Weather unavailable.')
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.getByRole('heading',{name:'Where are you headed?'})).toBeInTheDocument()
 })
