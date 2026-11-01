@@ -115,10 +115,16 @@ def corridor_grid(routes, interval_miles=40):
     return sorted(points)
 
 
-def simplify_geometry(vertices, tolerance=60):
-    """Douglas–Peucker display geometry in meters; scoring uses full vertices."""
+def simplify_geometry(vertices, tolerance=60, preserve_timing=False):
+    """Simplify display geometry; optionally retain timed position within tolerance.
+
+    Timing-aware simplification also checks where a vehicle would be at each
+    original timestamp. This retains speed changes and stationary maneuvers
+    that spatial simplification alone would discard. Scoring uses full vertices.
+    """
+    columns = 4 if preserve_timing else 2
     if len(vertices) < 3:
-        return [v[:2] for v in vertices]
+        return [v[:columns] for v in vertices]
     scale = math.cos(math.radians(sum(v[1] for v in vertices)/len(vertices)))
     points = [(v[0]*111195*scale, v[1]*111195) for v in vertices]
     keep = {0, len(points)-1}
@@ -134,9 +140,16 @@ def simplify_geometry(vertices, tolerance=60):
             x, y = points[i]
             ratio = max(0, min(1, ((x-ax)*dx+(y-ay)*dy)/denominator)) if denominator else 0
             squared = (x-ax-ratio*dx)**2+(y-ay-ratio*dy)**2
+            if preserve_timing:
+                start, end, point = vertices[first], vertices[last], vertices[i]
+                duration = end[3]-start[3]
+                time_ratio = (point[3]-start[3])/duration if duration > 0 else 0
+                timed_error = (x-ax-time_ratio*dx)**2+(y-ay-time_ratio*dy)**2
+                mileage_error = (point[2]-start[2]-time_ratio*(end[2]-start[2]))**2
+                squared = max(squared, timed_error, mileage_error)
             if squared > maximum:
                 maximum, farthest = squared, i
         if farthest is not None:
             keep.add(farthest)
             stack.extend([(first, farthest), (farthest, last)])
-    return [vertices[i][:2] for i in sorted(keep)]
+    return [vertices[i][:columns] for i in sorted(keep)]

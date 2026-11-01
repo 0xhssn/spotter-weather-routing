@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import { api } from './api'
 import type { Plan } from './types'
@@ -26,7 +26,12 @@ function plan(blocked=false):Plan {
     })),
   }
 }
-beforeEach(() => vi.mocked(api).mockReset())
+beforeEach(() => {
+  vi.mocked(api).mockReset()
+  // Keep unrelated form tests out of the annual repeated DST hour.
+  vi.spyOn(Date,'now').mockReturnValue(Date.parse('2026-11-02T16:00:00Z'))
+})
+afterEach(()=>vi.restoreAllMocks())
 
 it('shows all three route options and refuses to recommend when every route is blocked', async () => {
   vi.mocked(api).mockResolvedValueOnce(plan(true))
@@ -79,11 +84,11 @@ it('sends origin-local departure and the explicit fallback opt-in', async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
   render(<App/>)
   await screen.findByText('Route 1 is your lower-risk option')
-  fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:'2026-10-31T17:00'}})
+  fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:'2026-11-03T17:00'}})
   fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/))
   vi.mocked(api).mockResolvedValueOnce({...plan(),mode:'live',allow_road_fallback:true})
   await act(async()=>fireEvent.submit(screen.getByRole('button',{name:'Compare live routes'}).closest('form')!))
-  expect(JSON.parse(vi.mocked(api).mock.calls[1][1]!.body as string)).toMatchObject({departure:'2026-11-01T00:00:00Z',allow_road_fallback:true})
+  expect(JSON.parse(vi.mocked(api).mock.calls[1][1]!.body as string)).toMatchObject({departure:'2026-11-04T01:00:00Z',allow_road_fallback:true})
 })
 
 it('shows the server retry countdown when a new plan is throttled', async()=>{
@@ -105,4 +110,111 @@ it('does not overwrite a city being typed while the initial example is loading',
   await act(async()=>resolve(plan()))
   expect(screen.getByRole('combobox',{name:'Origin'})).toHaveValue('Denver')
   expect(screen.getByText(/Trip inputs changed/)).toBeInTheDocument()
+})
+
+async function showLivePlan() {
+  const example=plan()
+  vi.mocked(api).mockResolvedValueOnce(example)
+  render(<App/>)
+  await screen.findByText('Route 1 is your lower-risk option')
+  const live={...example,mode:'live' as const}
+  vi.mocked(api).mockResolvedValueOnce(live)
+  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
+  expect(screen.getByText('LIVE FORECAST')).toBeInTheDocument()
+  return live
+}
+
+it('allows a live check from example data, blocks duplicates while loading and after matching live results',async()=>{
+  vi.mocked(api).mockResolvedValueOnce(plan())
+  render(<App/>)
+  await screen.findByText('Route 1 is your lower-risk option')
+  const button=screen.getByRole('button',{name:'Compare live routes'}),form=button.closest('form')!
+  expect(button).toBeEnabled()
+  let resolve!:(value:Plan)=>void
+  vi.mocked(api).mockImplementationOnce(()=>new Promise(done=>{resolve=done}))
+  fireEvent.click(button)
+  expect(screen.getByRole('button',{name:'Comparing routes…'})).toBeDisabled()
+  fireEvent.submit(form)
+  expect(api).toHaveBeenCalledTimes(2)
+  await act(async()=>resolve({...plan(),mode:'live'}))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByText('Live results match these inputs. Change a trip setting to compare again.')).toBeInTheDocument()
+  fireEvent.submit(form)
+  expect(api).toHaveBeenCalledTimes(2)
+})
+
+it.each([
+  {name:'load weight',edit:()=>fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'40001'}}),restore:()=>fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'20000'}})},
+  {name:'checkpoint spacing',edit:()=>fireEvent.click(screen.getByRole('button',{name:'10 miles'})),restore:()=>fireEvent.click(screen.getByRole('button',{name:'25 miles'}))},
+  {name:'departure',edit:()=>fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:'2026-11-03T10:00'}}),restore:(value:string)=>fireEvent.change(screen.getByLabelText(/Departure/),{target:{value}})},
+  {name:'car-profile option',edit:()=>fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/)),restore:()=>fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/))},
+  {name:'origin and destination',edit:()=>fireEvent.click(screen.getByRole('button',{name:'Swap origin and destination'})),restore:()=>fireEvent.click(screen.getByRole('button',{name:'Swap origin and destination'}))},
+])('enables Compare for changed $name and disables it when the edit is reverted',async({edit,restore})=>{
+  await showLivePlan()
+  const button=screen.getByRole('button',{name:'Compare live routes'})
+  const originalDeparture=(screen.getByLabelText(/Departure/) as HTMLInputElement).value
+  expect(button).toBeDisabled()
+  edit()
+  expect(button).toBeEnabled()
+  restore(originalDeparture)
+  expect(button).toBeDisabled()
+  expect(api).toHaveBeenCalledTimes(2)
+})
+
+it('keeps Compare disabled when only the selected route, timeline, layers or details change',async()=>{
+  await showLivePlan()
+  fireEvent.click(screen.getByRole('button',{name:/^Route 2,/}))
+  fireEvent.change(screen.getByRole('slider'),{target:{value:'12'}})
+  fireEvent.click(screen.getByLabelText('Weather heatmap'))
+  fireEvent.click(screen.getByLabelText('Checkpoints',{exact:true}))
+  fireEvent.click(screen.getByRole('button',{name:'Checkpoint details'}))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(api).toHaveBeenCalledTimes(2)
+})
+
+it('allows retrying a failed changed trip and disables Compare after that retry succeeds',async()=>{
+  const live=await showLivePlan()
+  fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
+  vi.mocked(api).mockRejectedValueOnce(new ApiError('Weather is temporarily unavailable.',503,'provider_timeout'))
+  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
+  expect(screen.getByRole('alert')).toHaveTextContent('Weather is temporarily unavailable.')
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  vi.mocked(api).mockResolvedValueOnce({...live,spacing_miles:10})
+  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(api).toHaveBeenCalledTimes(4)
+})
+
+it('keeps edits made during an in-flight comparison eligible for another comparison',async()=>{
+  const live=await showLivePlan()
+  fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
+  let resolve!:(value:Plan)=>void
+  vi.mocked(api).mockImplementationOnce(()=>new Promise(done=>{resolve=done}))
+  fireEvent.click(screen.getByRole('button',{name:'Compare live routes'}))
+  fireEvent.click(screen.getByRole('button',{name:'50 miles'}))
+  expect(screen.getByRole('button',{name:'Comparing routes…'})).toBeDisabled()
+  await act(async()=>resolve({...live,spacing_miles:10}))
+  expect(screen.getByRole('button',{name:'50 miles'})).toHaveAttribute('aria-pressed','true')
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+})
+
+it('requires valid trip inputs and a selected city before enabling a new live comparison',async()=>{
+  vi.mocked(api).mockResolvedValueOnce(plan())
+  render(<App/>)
+  await screen.findByText('Route 1 is your lower-risk option')
+  fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'-1'}})
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'20000'}})
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  const departure=(screen.getByLabelText(/Departure/) as HTMLInputElement).value
+  fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:''}})
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:departure}})
+  fireEvent.change(screen.getByRole('combobox',{name:'Origin'}),{target:{value:'Denver'}})
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByText('Choose both cities from the search results.')).toBeInTheDocument()
+  fireEvent.submit(screen.getByRole('button',{name:'Compare live routes'}).closest('form')!)
+  expect(api).toHaveBeenCalledTimes(1)
 })

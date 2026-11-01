@@ -78,11 +78,12 @@ def build_plan(origin, destination, departure, load, spacing, example=False, all
             risk = classify(weather["wind_mph"], weather["rain_in"], weather["snow_in"], load)
             checkpoints.append({"id": f"{path['id']}-cp-{i}", "lon": lon, "lat": lat,
                                 "mile": meters/MILE_M, "eta": eta.isoformat(), "weather": weather, "risk": risk})
-        coords = simplify_geometry(path["vertices"])
+        timed_geometry = simplify_geometry(path["vertices"], preserve_timing=True)
         routes.append({"id": path["id"], "name": path["name"], "via": path["via"],
                        "routing_profile": path.get("routing_profile", "truck"), "distance_miles": path["distance_m"]/MILE_M, "duration_s": path["duration_s"],
                        "arrival": (departure+timedelta(seconds=path["duration_s"])).isoformat(),
-                       "geometry": {"type": "LineString", "coordinates": coords},
+                       "geometry": {"type": "LineString", "coordinates": [v[:2] for v in timed_geometry]},
+                       "geometry_progress": [[v[2]/MILE_M, v[3]] for v in timed_geometry],
                        "checkpoints": checkpoints, "summary": summarize(checkpoints, path["duration_s"])})
     heatmap = []
     for lon, lat in grid:

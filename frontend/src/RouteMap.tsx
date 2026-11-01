@@ -1,14 +1,31 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
-import { CircleMarker, MapContainer, Pane, Polyline, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Pane, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { COLORS } from './types'
 import type { Checkpoint, Plan, Route } from './types'
 import { riskRaster } from './heatmap'
 import { thinCheckpoints } from './markers'
 import { riskMiles, travelTime } from './format'
 import { displayedArrival, originZone, tripDate, tripTime } from './time'
+import { journeyPosition } from './journey'
+import { journeyLabel } from './JourneyProgress'
 
 const routeColors=['#2454b0','#606fa8','#007d91']
+const vehicleIcon=(car:boolean)=>L.divIcon({className:'journey-marker',iconSize:[36,36],iconAnchor:[18,18],tooltipAnchor:[0,-23],html:`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${car?'<path d="m5 8 2-4h10l2 4M5 8h14a2 2 0 0 1 2 2v7H3v-7a2 2 0 0 1 2-2ZM3 13h18M6 17v3m12-3v3"/>':'<path d="M1 3h14v12H1zM15 7h4l3 4v4h-7"/><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/>'}</svg>`})
+const truckIcon=vehicleIcon(false),carIcon=vehicleIcon(true)
+const JourneyMarker=memo(function JourneyMarker({plan,selectedId,hour}:{plan:Plan;selectedId:string;hour:number}) {
+  const marker=useRef<L.Marker|null>(null)
+  const route=plan.routes.find(r=>r.id===selectedId),position=route?journeyPosition(route,hour*3600):null
+  const label=route&&position?`Estimated ${route.routing_profile==='car'?'car':'truck'} position · ${route.name} · ${journeyLabel(position)}`:''
+  useEffect(()=>{
+    const element=marker.current?.getElement()
+    if(element){element.title=label;element.setAttribute('aria-label',label)}
+  },[label])
+  if(!route||!position)return null
+  return <Pane name="journey-position" style={{zIndex:475}}><Marker ref={marker} position={[position.lat,position.lon]} icon={route.routing_profile==='car'?carIcon:truckIcon} title={label} alt={label} keyboard={true}>
+    <Tooltip direction="top" permanent className="journey-tooltip"><strong>Estimated position</strong><br/>{journeyLabel(position)}{!route.summary.eligible&&<><br/><span>No Travel · preview only</span></>}</Tooltip>
+  </Marker></Pane>
+})
 const FitRoutes=memo(function FitRoutes({plan,fitKey}:{plan:Plan;fitKey:number}) {
   const map=useMap()
   useEffect(()=>{
@@ -71,6 +88,6 @@ const CheckpointLayers=memo(function CheckpointLayers({plan,selectedId,onSelect,
   </Pane>
 })
 export const RouteMap=memo(function RouteMap({plan,selectedId,onSelect,hour,showHeat,showCheckpoints,fitKey,onCheckpoint}:{plan:Plan;selectedId:string;onSelect:(id:string)=>void;hour:number;showHeat:boolean;showCheckpoints:boolean;fitKey:number;onCheckpoint:(c:Checkpoint)=>void}) {
-  return <MapContainer center={[33.8,-115.1]} zoom={6} zoomControl={false} className="route-map" preferCanvas><TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'/><FitRoutes plan={plan} fitKey={fitKey}/><Heatmap plan={plan} hour={hour} visible={showHeat}/><RoadLayers plan={plan} selectedId={selectedId} onSelect={onSelect}/><CheckpointLayers plan={plan} selectedId={selectedId} onSelect={onSelect} onCheckpoint={onCheckpoint} visible={showCheckpoints}/><MapControls/></MapContainer>
+  return <MapContainer center={[33.8,-115.1]} zoom={6} zoomControl={false} className="route-map" preferCanvas><TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'/><FitRoutes plan={plan} fitKey={fitKey}/><Heatmap plan={plan} hour={Math.floor(hour)} visible={showHeat}/><RoadLayers plan={plan} selectedId={selectedId} onSelect={onSelect}/><CheckpointLayers plan={plan} selectedId={selectedId} onSelect={onSelect} onCheckpoint={onCheckpoint} visible={showCheckpoints}/><JourneyMarker plan={plan} selectedId={selectedId} hour={hour}/><MapControls/></MapContainer>
 })
 const MapControls=memo(function MapControls(){const map=useMap();return <div className="map-zoom" onPointerDown={e=>e.stopPropagation()}><button aria-label="Zoom in" onClick={()=>map.zoomIn()}>+</button><button aria-label="Zoom out" onClick={()=>map.zoomOut()}>−</button></div>})

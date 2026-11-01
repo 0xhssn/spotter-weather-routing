@@ -25,7 +25,7 @@ make backend
 make frontend
 ```
 
-Open http://localhost:5173. The initial screen is a **labeled example** with three recorded LA–Phoenix road routes and simulated weather. **Compare live routes** calls the real providers; a failed provider never silently becomes example data. City search supports cities and postal codes, not street addresses.
+Open http://localhost:5173. The initial screen is a **labeled example** with three recorded LA–Phoenix road routes and simulated weather. **Compare live routes** calls the real providers; a failed provider never silently becomes example data. City search supports cities and postal codes, not street addresses. Compare is enabled for valid new or changed trip inputs, including fetching live data from the example. It is disabled while comparing, during rate-limit cooldowns, and when displayed live results already match the inputs. Reverting an edit disables it again; forecast viewing and map controls use the loaded data. Failed changed-trip requests remain retryable.
 
 ## Docker
 
@@ -47,6 +47,7 @@ For deployment, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_KEY`, and the 
 - Load-aware risk classification and a deterministic, lexicographic route recommendation. Any No Travel checkpoint disqualifies a route; if all routes are blocked, no recommendation is made.
 - Leaflet road routes with a full-opacity selected line and white casing, zoom-aware checkpoints that retain every Moderate-or-higher point, and positional risk strips from origin to destination, keyboard-accessible checkpoint table, route-summary map popups, and corridor weather rendered on a canvas overlay. Cards expose average risk, and positive fractional risk mileage is never displayed as zero. Single-route results say so; High/Severe recommendations use caution colors. Provider notices appear above the cards.
 - The heatmap has 49 precomputed hourly score frames. Low-risk fields are nearly transparent; Severe and No Travel fields are stronger and wider. Forecast state is isolated from cards and the checkpoint table, and route/marker layers are memoized. Slider movement, animation, and toggling layers do not make API calls or recompute route scores.
+- The selected route has an estimated truck position that moves with the forecast hour, with miles traveled/remaining and an Arrived state after the trip ends. Playback advances one trip hour in four seconds, moves in small increments and pauses at exact arrival (or the 48-hour horizon for longer trips). The full 0–48 hour slider remains available after arrival; corridor weather updates hourly. Selecting a different route resets the truck and forecast to departure and pauses playback. Car-profile routes use a car icon. Position follows the road's provider travel times, including slower sections and stationary maneuvers; it excludes traffic and driver rest stops. No Travel routes remain excluded and are explicitly labeled as previews.
 - Parallel, batched weather requests with bounded location counts; a shared 23-second provider budget with bounded timeouts and one short transient-error retry; cached geocoding/routing/weather and five-minute complete plans; explicit missing-forecast and upstream-error states.
 - Responsive layout, keyboard city selection, reduced-motion support, accessible controls, and a keyboard-dismissable methodology dialog.
 
@@ -96,7 +97,7 @@ Application limits: departure now to seven days ahead, routes up to 5,000 miles,
 | `POST /api/plan` | JSON origin/destination `{label,lat,lon}`, ISO departure with timezone, `load_lb`, `spacing_miles` |
 | `GET /api/example?load_lb=20000&spacing_miles=25` | Explicit example with simulated weather |
 
-Plans return source mode, inputs (including explicit `allow_road_fallback`), route routing profiles/geometry/checkpoints, risk mileages, recommendation ID or null, heatmap frames, warnings, and source metadata. Requests are stateless, same-origin, and do not mutate stored user data. There is no public arbitrary-URL proxy.
+Plans return source mode, inputs (including explicit `allow_road_fallback`), route routing profiles/geometry/checkpoints, risk mileages, recommendation ID or null, heatmap frames, warnings, and source metadata. Each route's `geometry_progress` contains `[mile, elapsed_seconds]` pairs aligned with `geometry.coordinates`; timing-aware simplification bounds display position/mileage error to approximately 60 meters relative to the original routing geometry. Scoring still uses the full original geometry. Requests are stateless, same-origin, and do not mutate stored user data. There is no public arbitrary-URL proxy.
 
 ## Validation
 
@@ -107,7 +108,7 @@ make build
 docker compose config --quiet
 ```
 
-The 56 backend and 30 frontend tests cover threshold boundaries and fractional wind, strict load overrides, worst-condition behavior, No Travel exclusion, weighted mileage and partial intervals, recommendation tie-breaks, step-based ETA interpolation, forecast units/time bins, missing forecasts, input validation, upstream failure, the full example API contract, live orchestration at all three spacings, arrival-dependent route exclusion, malformed providers, route deduplication, stale city-search responses, city resets, timeline isolation, all-blocked UI, proxy errors, and heatmap overlap colors. See `docs/qa-fixes.md` for the latest QA fixes and checks; `docs/verification.md` records the earlier baseline.
+The 60 backend and 52 frontend tests cover threshold boundaries and fractional wind, strict load overrides, worst-condition behavior, No Travel exclusion, weighted mileage and partial intervals, recommendation tie-breaks, step-based ETA interpolation, forecast units/time bins, missing forecasts, input validation, upstream failure, the full example API contract, live orchestration at all three spacings, arrival-dependent route exclusion, malformed providers, route deduplication, stale city-search responses, city resets, timeline isolation, all-blocked UI, proxy errors, and heatmap overlap colors. See `docs/qa-fixes.md` for the latest QA fixes and checks; `docs/verification.md` records the earlier baseline.
 
 ## Structure
 

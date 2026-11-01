@@ -70,7 +70,7 @@ export default function App(){
   },[method])
   async function compare(event:React.FormEvent){
     event.preventDefault()
-    if(retryAfter)return
+    if(!canCompare)return
     if(!origin||!destination){setError('Choose both cities from the search results.');return}
     request.current?.abort();const controller=new AbortController();request.current=controller
     const sequence=++requestSequence.current
@@ -91,7 +91,18 @@ export default function App(){
     if(place?.timezone && place.timezone!==zone && parsedDeparture)setDeparture(localInput(parsedDeparture,place.timezone))
     setOrigin(place)
   }
-  const dirty=!!plan&&(origin?.lat!==plan.origin.lat||origin?.lon!==plan.origin.lon||destination?.lat!==plan.destination.lat||destination?.lon!==plan.destination.lon||load!==plan.load_lb||spacing!==plan.spacing_miles||allowRoad!==!!plan.allow_road_fallback||!parsedDeparture||Math.abs(new Date(parsedDeparture).getTime()-new Date(plan.departure).getTime())>=60000)
+  const dirty=!!plan&&(origin?.lat!==plan.origin.lat||origin?.lon!==plan.origin.lon||destination?.lat!==plan.destination.lat||destination?.lon!==plan.destination.lon||load!==plan.load_lb||spacing!==plan.spacing_miles||allowRoad!==!!plan.allow_road_fallback||!parsedDeparture||Date.parse(parsedDeparture)!==Date.parse(plan.departure))
+  const departureMs=Date.parse(parsedDeparture),now=Date.now()
+  const invalidInput=!origin||!destination?'Choose both cities from the search results.':
+    Math.abs(origin.lat-destination.lat)+Math.abs(origin.lon-destination.lon)<.01?'Choose different origin and destination cities.':
+    !parsedDeparture?'Choose a valid, unambiguous departure time at the origin.':
+    departureMs<Math.floor(now/60000)*60000||departureMs>Math.floor((now+7*86400000)/60000)*60000?'Choose a departure between now and seven days from now.':
+    !Number.isInteger(load)||load<0||load>100000?'Enter a whole-number load between 0 and 100,000 lb.':''
+  const hasNewInformation=!plan||plan.mode==='example'||dirty
+  const canCompare=!busy&&retryAfter===0&&!invalidInput&&hasNewInformation
+  const compareHelp=busy?'Checking roads and weather…':retryAfter>0?`Please wait ${retryAfter} seconds before trying again.`:invalidInput||
+    (!hasNewInformation?'Live results match these inputs. Change a trip setting to compare again.':
+      dirty?'Trip changed. Compare to update roads and weather.':'Compare to fetch live roads and weather for this trip.')
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span><div className="topbar-right"><span className="assessment-tag">Built for Spotter</span><button className="icon-button" aria-label="How route recommendations work" onClick={()=>setMethod(true)}><Info size={19}/></button><span className="avatar">HH</span></div></header>
     <div className="workspace">
@@ -104,7 +115,8 @@ export default function App(){
           <div className="load-heading"><label htmlFor="load">Load weight</label><Truck size={15}/></div><div className="weight-input"><input id="load" type="number" min="0" max="100000" step="1" required value={load} onChange={e=>setLoad(Number(e.target.value))}/><span>lb</span></div>
           <div className="spacing-heading"><label>Weather checkpoints</label><span>Every</span></div><div className="segmented" role="group" aria-label="Checkpoint spacing">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} miles</button>)}</div>
           <label className="fallback-option"><input type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)}/>Allow car-profile comparison</label><p className="fallback-help">Long trips only. Truck restrictions are not checked.</p>
-          <button type="submit" className="primary-button" disabled={busy||retryAfter>0}>{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<>Compare live routes<ArrowRight size={17}/></>}</button>
+          <button type="submit" className="primary-button" disabled={!canCompare} aria-busy={busy} aria-describedby="compare-help">{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<>Compare live routes<ArrowRight size={17}/></>}</button>
+          <p id="compare-help" className="compare-help">{compareHelp}</p>
           <button type="button" className="example-button" onClick={()=>void example()} disabled={busy}><FlaskConical size={14}/>Load example scenario</button>
         </form>
         <div className="sidebar-footnote"><ShieldCheck size={18}/><p>Weather changes. Your route can too.<br/><span>Forecasts support your judgment.</span></p></div>
@@ -120,7 +132,7 @@ export default function App(){
           <section className="route-cards" aria-label="Route options" style={{gridTemplateColumns:`repeat(${Math.max(1,plan.routes.length)},minmax(0,1fr))`}}>{plan.routes.map((route,i)=><RouteCard key={route.id} route={route} index={i} selected={selectedId===route.id} recommended={route.id===plan.recommended_id} onSelect={select} departure={plan.departure} zone={resultZone}/>)}</section>
           <Recommendation plan={plan} onSelect={select}/>
           <ForecastPanel plan={plan} selectedId={selectedId} onSelect={select} busy={busy} checkpoint={checkpoint} onCheckpoint={setCheckpoint}/>
-          <div className="below-map"><span><Info size={14}/>The timeline changes the corridor forecast. Route scores use each checkpoint’s arrival time.</span><button onClick={()=>setTableOpen(v=>!v)} aria-expanded={tableOpen}>Checkpoint details<ChevronDown size={15} style={{transform:tableOpen?'rotate(180deg)':undefined}}/></button></div>
+          <div className="below-map"><span><Info size={14}/>The timeline shows weather and estimated vehicle progress. Route scores use each checkpoint’s arrival time.</span><button onClick={()=>setTableOpen(v=>!v)} aria-expanded={tableOpen}>Checkpoint details<ChevronDown size={15} style={{transform:tableOpen?'rotate(180deg)':undefined}}/></button></div>
           {tableOpen && selected && <CheckpointTable route={selected} onCheckpoint={setCheckpoint} zone={resultZone}/>}
           <div className="limitations"><Truck size={15}/><p>{plan.warnings.find(w=>w.startsWith('Road routes'))} {plan.warnings.filter(w=>!w.startsWith('Road routes')&&!w.startsWith('Example scenario')).join(' ')}</p></div>
           <footer><span>Made for the miles ahead.</span><span>{plan.providers.routing.split(' / ')[0]} · Open-Meteo · OpenStreetMap</span></footer>
