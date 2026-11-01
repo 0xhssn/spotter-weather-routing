@@ -9,11 +9,12 @@ from .geometry import MILE_M, parse_osrm_route, point_at, sample
 from .providers import ProviderError
 from .risk import LEVELS, classify, recommend, summarize
 from .service import read_weather
+from .test_regressions import raw_route
 
 
 @override_settings(ROUTING_PROVIDER='valhalla',VALHALLA_BASE_URL='https://router.example')
 class RoutingAdapterTests(SimpleTestCase):
-    @patch('planner.providers.get_json',return_value={'code':'Ok','routes':[{'distance':100}]})
+    @patch('planner.providers.get_json',return_value={'code':'Ok','routes':[raw_route()]})
     def test_truck_profile_uses_gross_weight_and_explicit_dimensions(self,fetch):
         from .providers import routing_request
         routing_request([(-118,34),(-112,33)],2,20000)

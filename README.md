@@ -107,7 +107,7 @@ make build
 docker compose config --quiet
 ```
 
-The 56 backend and 30 frontend tests cover threshold boundaries and fractional wind, strict load overrides, worst-condition behavior, No Travel exclusion, weighted mileage and partial intervals, recommendation tie-breaks, step-based ETA interpolation, forecast units/time bins, missing forecasts, input validation, upstream failure, the full example API contract, live orchestration at all three spacings, arrival-dependent route exclusion, malformed providers, route deduplication, stale city-search responses, city resets, timeline isolation, all-blocked UI, proxy errors, and heatmap overlap colors. See `docs/qa-fixes.md` for the latest QA fixes and checks; `docs/verification.md` records the earlier baseline.
+The 64 backend and 53 frontend tests cover threshold boundaries and fractional wind, strict load overrides, worst-condition behavior, No Travel exclusion, weighted mileage and partial intervals, recommendation tie-breaks, step-based ETA interpolation, forecast units/time bins, missing forecasts, input validation, upstream failure, the full example API contract, live orchestration at all three spacings, arrival-dependent route exclusion, malformed providers, route deduplication, stale city-search responses, city resets, timeline isolation, all-blocked UI, proxy errors, heatmap overlap colors, malformed-response recovery, cache validation, mixed-validity alternatives, and cancellation of slowly streaming provider responses. Successful plan and city-search responses are validated before entering UI state; unexpected render failures offer a reload action. See `docs/qa-fixes.md` for the latest QA fixes and checks; `docs/verification.md` records the earlier baseline.
 
 ## Structure
 
