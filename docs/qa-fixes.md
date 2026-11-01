@@ -64,3 +64,15 @@ Verification: all 52 frontend tests and the production build pass, including 10 
 ## Typography — November 1, 2026
 
 Implemented T1–T8: rem type tokens, readable supporting text and mobile inputs, visible recommendation/method labels, responsive card layouts, darker secondary and risk text, bounded paragraphs, numeric alignment fallback and legible attribution. See [typography verification](typography.md) for measurements and before/after screenshots. All 52 frontend regressions, the new typography guard and production build pass. Browser text audits found no unexpected small text, contrast flags, supporting-text clipping or page overflow at 390, 768, 1024, 1280 and 1440 px. The table, card, dialog, Severe/No Travel examples and a 20 px root-size preview were also checked.
+
+## Vehicle tooltip — November 1, 2026
+
+Typography was committed separately as eb2efc0 before this follow-up. The vehicle tooltip is now on demand, with a compact vehicle/route heading and one mileage line. Hover, keyboard focus or tap opens it; mouseout/blur, Escape, outside clicks, map movement, timeline edits and route changes dismiss it. Progress remains readable below the map. Native title tooltips are removed to avoid duplicate popovers; the accessible vehicle label is set when the Leaflet marker is added and updates with its position.
+
+Browser checks at 1280 and 390 px cover default-hidden details, click and keyboard activation, Escape/outside dismissal, timeline changes, route resets and arrival details fitting inside the phone map. Typography guard, 52 frontend regressions and production build pass.
+
+## Neutral position marker — November 1, 2026
+
+Replaced the fixed right-facing truck/car artwork on the map with a smaller blue circular position marker, a white centre and a white halo. It communicates estimated location without implying a heading, so westbound and eastbound trips use the same neutral symbol. Truck/car profile information remains in the progress panel and on-demand tooltip. Position interpolation, arrival/reset behaviour, weather and risk calculations are unchanged.
+
+Verification: all 52 frontend tests, the typography guard and production build pass. Browser checks confirmed eastbound LA–Phoenix progress moves right and a live westbound Phoenix–LA comparison moves left as time advances. Both use the same 24 px neutral symbol, with accessible progress text and no vehicle artwork or permanent tooltip. On-demand details still open and fit at 390 px, Escape dismisses them, and the browser console has no errors.
