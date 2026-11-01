@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run"
+    "test": "npm run check:typography && vitest run",
+    "check:typography": "node scripts/check-typography.mjs"
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",
@@ -28,6 +29,7 @@
     "jsdom": "^26.1.0",
     "typescript": "~5.9.3",
     "vite": "^7.2.0",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "postcss": "8.5.32"
   }
 }

@@ -107,7 +107,7 @@ export default function App(){
     <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span><div className="topbar-right"><span className="assessment-tag">Built for Spotter</span><button className="icon-button" aria-label="How route recommendations work" onClick={()=>setMethod(true)}><Info size={19}/></button><span className="avatar">HH</span></div></header>
     <div className="workspace">
       <aside className="sidebar">
-        <div className="sidebar-title"><div><span className="eyebrow">EVERY MILE, INFORMED</span><h1>A clearer road ahead.</h1></div><span className="title-mark"><Compass size={27}/></span></div>
+        <div className="sidebar-title"><div><span className="eyebrow">EVERY MILE, INFORMED</span><h2>A clearer road ahead.</h2></div><span className="title-mark"><Compass size={27}/></span></div>
         <p className="intro">Plan your trip around the weather.<br/>Find the route with less risk.</p>
         <form onSubmit={compare}>
           <div className="location-fields"><PlaceSearch label="Origin" value={origin} onChange={changeOrigin}/><button type="button" className="swap-button" aria-label="Swap origin and destination" disabled={!origin||!destination} onClick={()=>{changeOrigin(destination);setDestination(origin)}}><ArrowDownUp size={14}/></button><PlaceSearch label="Destination" value={destination} onChange={setDestination}/></div>
@@ -122,14 +122,14 @@ export default function App(){
         <div className="sidebar-footnote"><ShieldCheck size={18}/><p>Weather changes. Your route can too.<br/><span>Forecasts support your judgment.</span></p></div>
       </aside>
       <main className="main-content">
-        <div className="page-heading"><div><div className="breadcrumb">Route planner <span>/</span> Trip overview</div><h2>Your trip, with perspective.</h2><p>Compare the road ahead before you get behind the wheel.</p></div><button className="secondary-button" onClick={()=>setMethod(true)}><SlidersHorizontal size={15}/>How we compare</button></div>
+        <div className="page-heading"><div><div className="breadcrumb">Route planner <span>/</span> Trip overview</div><h1>Your trip, with perspective.</h1><p>Compare the road ahead before you get behind the wheel.</p></div><button className="secondary-button" onClick={()=>setMethod(true)}><SlidersHorizontal size={15}/>How we compare</button></div>
         {error && <div className="error-banner" role="alert"><Info size={18}/><span>{error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
         {plan && <>
           <div className="trip-strip"><div><span className="trip-points"><span/>{plan.origin.label.split(',')[0]}<ArrowRight size={15}/>{plan.destination.label.split(',')[0]}</span><span className="trip-meta">{tripDate(plan.departure,resultZone)} · {tripTime(plan.departure,resultZone)} · {plan.load_lb.toLocaleString()} lb</span></div><span className={plan.mode==='example'?'data-tag example':'data-tag live'}><span/>{plan.mode==='example'?'EXAMPLE DATA':'LIVE FORECAST'}</span></div>
           {dirty && <div className="changed-note"><Info size={14}/>Trip inputs changed. Compare routes to update these results.</div>}
           {plan.mode==='example' && <div className="example-note"><FlaskConical size={14}/>Recorded roads + simulated weather. Compare live routes for current conditions.</div>}
           {plan.warnings.filter(w=>!w.startsWith('Road routes')&&!w.startsWith('Example scenario')).map(w=><div className={`provider-notice ${w.startsWith('Car-profile')?'car-notice':''}`} key={w} role="note"><Info size={16}/><span>{w}</span></div>)}
-          <section className="route-cards" aria-label="Route options" style={{gridTemplateColumns:`repeat(${Math.max(1,plan.routes.length)},minmax(0,1fr))`}}>{plan.routes.map((route,i)=><RouteCard key={route.id} route={route} index={i} selected={selectedId===route.id} recommended={route.id===plan.recommended_id} onSelect={select} departure={plan.departure} zone={resultZone}/>)}</section>
+          <section className="route-cards" aria-label="Route options">{plan.routes.map((route,i)=><RouteCard key={route.id} route={route} index={i} selected={selectedId===route.id} recommended={route.id===plan.recommended_id} onSelect={select} departure={plan.departure} zone={resultZone}/>)}</section>
           <Recommendation plan={plan} onSelect={select}/>
           <ForecastPanel plan={plan} selectedId={selectedId} onSelect={select} busy={busy} checkpoint={checkpoint} onCheckpoint={setCheckpoint}/>
           <div className="below-map"><span><Info size={14}/>The timeline shows weather and estimated vehicle progress. Route scores use each checkpoint’s arrival time.</span><button onClick={()=>setTableOpen(v=>!v)} aria-expanded={tableOpen}>Checkpoint details<ChevronDown size={15} style={{transform:tableOpen?'rotate(180deg)':undefined}}/></button></div>

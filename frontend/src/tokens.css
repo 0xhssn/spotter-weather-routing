@@ -1,0 +1,29 @@
+:root {
+  /* Respect the browser's default font size; 1rem is normally 16px. */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-title: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: Manrope, 'DM Sans', sans-serif;
+  --text-primary: #263b35;
+  --muted: #526158;
+  --green: #1d7059;
+  --border: #e1e6df;
+  --dark: #1a3028;
+  --link: #1c5f8a;
+  --text-error: #88402e;
+  --text-warning: #735015;
+
+  /* Text uses darker colours; markers, bars and the heatmap keep their palette. */
+  --risk-text-low: #2e7d67;
+  --risk-text-moderate: #8a6500;
+  --risk-text-high: #b4530a;
+  --risk-text-severe: #b83a3b;
+  --risk-text-no-travel: #913854;
+}

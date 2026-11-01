@@ -11,7 +11,7 @@ import { journeyPosition } from './journey'
 import { journeyLabel } from './JourneyProgress'
 
 const routeColors=['#2454b0','#606fa8','#007d91']
-const vehicleIcon=(car:boolean)=>L.divIcon({className:'journey-marker',iconSize:[36,36],iconAnchor:[18,18],tooltipAnchor:[0,-23],html:`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${car?'<path d="m5 8 2-4h10l2 4M5 8h14a2 2 0 0 1 2 2v7H3v-7a2 2 0 0 1 2-2ZM3 13h18M6 17v3m12-3v3"/>':'<path d="M1 3h14v12H1zM15 7h4l3 4v4h-7"/><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/>'}</svg>`})
+const vehicleIcon=(car:boolean)=>L.divIcon({className:'journey-marker',iconSize:[36,36],iconAnchor:[18,18],tooltipAnchor:[0,0],html:`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${car?'<path d="m5 8 2-4h10l2 4M5 8h14a2 2 0 0 1 2 2v7H3v-7a2 2 0 0 1 2-2ZM3 13h18M6 17v3m12-3v3"/>':'<path d="M1 3h14v12H1zM15 7h4l3 4v4h-7"/><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/>'}</svg>`})
 const truckIcon=vehicleIcon(false),carIcon=vehicleIcon(true)
 const JourneyMarker=memo(function JourneyMarker({plan,selectedId,hour}:{plan:Plan;selectedId:string;hour:number}) {
   const marker=useRef<L.Marker|null>(null)
@@ -23,7 +23,7 @@ const JourneyMarker=memo(function JourneyMarker({plan,selectedId,hour}:{plan:Pla
   },[label])
   if(!route||!position)return null
   return <Pane name="journey-position" style={{zIndex:475}}><Marker ref={marker} position={[position.lat,position.lon]} icon={route.routing_profile==='car'?carIcon:truckIcon} title={label} alt={label} keyboard={true}>
-    <Tooltip direction="top" permanent className="journey-tooltip"><strong>Estimated position</strong><br/>{journeyLabel(position)}{!route.summary.eligible&&<><br/><span>No Travel · preview only</span></>}</Tooltip>
+    <Tooltip direction="auto" offset={[14,0]} opacity={1} permanent className="journey-tooltip"><strong>Estimated position</strong><br/>{journeyLabel(position)}{!route.summary.eligible&&<><br/><span>No Travel · preview only</span></>}</Tooltip>
   </Marker></Pane>
 })
 const FitRoutes=memo(function FitRoutes({plan,fitKey}:{plan:Plan;fitKey:number}) {
