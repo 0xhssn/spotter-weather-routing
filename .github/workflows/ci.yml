@@ -41,10 +41,15 @@ jobs:
       - name: Configure production-mode container environment
         run: |
           python3 - <<'PYTHON'
+          import json
           import secrets
+          import subprocess
           from pathlib import Path
+          subprocess.run(['python3', 'scripts/create_demo_password.py', '--output', '.demo-access.ci.json'], check=True)
+          credentials = json.loads(Path('.demo-access.ci.json').read_text())
           Path('.env.ci').write_text(
               'DJANGO_DEBUG=false\n'
+              f"DEMO_ACCESS_PASSWORD_SHA256={credentials['password_sha256']}\n"
               f'DJANGO_SECRET_KEY={secrets.token_urlsafe(48)}\n'
               'DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend\n'
           )
@@ -53,7 +58,7 @@ jobs:
       - name: Build and start both containers
         run: docker compose up --build --wait --wait-timeout 120
       - name: Check frontend, static assets and proxied API
-        run: python3 scripts/docker_smoke.py
+        run: python3 scripts/docker_smoke.py --password-file .demo-access.ci.json
       - name: Container logs
         if: failure()
         run: docker compose logs --no-color
