@@ -436,6 +436,7 @@ input[type=datetime-local] {
 }
 
 .primary-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -451,6 +452,31 @@ input[type=datetime-local] {
   box-shadow: 0 3px 5px #194c2812;
   min-height: 2.75rem;
   padding: 11px 12px;
+}
+
+.compare-button-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.primary-button.has-updates:not(:disabled) {
+  box-shadow: 0 0 0 2px #f2d38d;
+}
+
+.compare-update-badge {
+  position: absolute;
+  top: -0.875rem;
+  right: 0.5rem;
+  padding: 2px 8px;
+  border: 1px solid #d9b66b;
+  border-radius: 999px;
+  background: #fff0c8;
+  color: var(--text-warning);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 .primary-button:hover {

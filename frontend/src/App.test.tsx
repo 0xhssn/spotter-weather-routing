@@ -59,6 +59,7 @@ it('marks stale results and sends edited cargo and checkpoint spacing in the liv
   fireEvent.change(screen.getByLabelText('Load weight'),{target:{value:'40001'}})
   fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
   expect(screen.getByText(/Trip inputs changed/)).toBeInTheDocument()
+  expect(within(screen.getByRole('button',{name:'Compare live routes'})).getByText('Update needed')).toBeInTheDocument()
   vi.mocked(api).mockResolvedValueOnce({...plan(),mode:'live',load_lb:40001,spacing_miles:10})
   await act(async () => fireEvent.submit(screen.getByRole('button',{name:'Compare live routes'}).closest('form')!))
   const [url, options]=vi.mocked(api).mock.calls[1]
@@ -66,6 +67,7 @@ it('marks stale results and sends edited cargo and checkpoint spacing in the liv
   expect(JSON.parse(options!.body as string)).toMatchObject({load_lb:40001,spacing_miles:10})
   expect(screen.getByText('LIVE FORECAST')).toBeInTheDocument()
   expect(screen.queryByText(/Trip inputs changed/)).not.toBeInTheDocument()
+  expect(screen.queryByText('Update needed')).not.toBeInTheDocument()
 })
 
 
@@ -124,7 +126,7 @@ async function showLivePlan() {
   return live
 }
 
-it('allows a live check from example data, blocks duplicates while loading and after matching live results',async()=>{
+it('allows live and repeat checks while blocking duplicate in-flight submissions',async()=>{
   vi.mocked(api).mockResolvedValueOnce(plan())
   render(<App/>)
   await screen.findByText('Route 1 is your lower-risk option')
@@ -137,10 +139,13 @@ it('allows a live check from example data, blocks duplicates while loading and a
   fireEvent.submit(form)
   expect(api).toHaveBeenCalledTimes(2)
   await act(async()=>resolve({...plan(),mode:'live'}))
-  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
-  expect(screen.getByText('Live results match these inputs. Change a trip setting to compare again.')).toBeInTheDocument()
-  fireEvent.submit(form)
-  expect(api).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.getByText('Live results shown. Compare again to recheck this trip.')).toBeInTheDocument()
+  expect(screen.queryByText('Update needed')).not.toBeInTheDocument()
+  vi.mocked(api).mockResolvedValueOnce({...plan(),mode:'live'})
+  await act(async()=>fireEvent.submit(form))
+  expect(api).toHaveBeenCalledTimes(3)
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
 })
 
 it.each([
@@ -149,39 +154,45 @@ it.each([
   {name:'departure',edit:()=>fireEvent.change(screen.getByLabelText(/Departure/),{target:{value:'2026-11-03T10:00'}}),restore:(value:string)=>fireEvent.change(screen.getByLabelText(/Departure/),{target:{value}})},
   {name:'car-profile option',edit:()=>fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/)),restore:()=>fireEvent.click(screen.getByLabelText(/Allow car-profile comparison/))},
   {name:'origin and destination',edit:()=>fireEvent.click(screen.getByRole('button',{name:'Swap origin and destination'})),restore:()=>fireEvent.click(screen.getByRole('button',{name:'Swap origin and destination'}))},
-])('enables Compare for changed $name and disables it when the edit is reverted',async({edit,restore})=>{
+])('marks changed $name and clears the mark when the edit is reverted',async({edit,restore})=>{
   await showLivePlan()
   const button=screen.getByRole('button',{name:'Compare live routes'})
   const originalDeparture=(screen.getByLabelText(/Departure/) as HTMLInputElement).value
-  expect(button).toBeDisabled()
+  expect(button).toBeEnabled()
+  expect(within(button).queryByText('Update needed')).not.toBeInTheDocument()
   edit()
   expect(button).toBeEnabled()
+  expect(within(button).getByText('Update needed')).toBeInTheDocument()
   restore(originalDeparture)
-  expect(button).toBeDisabled()
+  expect(button).toBeEnabled()
+  expect(within(button).queryByText('Update needed')).not.toBeInTheDocument()
   expect(api).toHaveBeenCalledTimes(2)
 })
 
-it('keeps Compare disabled when only the selected route, timeline, layers or details change',async()=>{
+it('does not mark the trip changed when only the selected route, timeline, layers or details change',async()=>{
   await showLivePlan()
   fireEvent.click(screen.getByRole('button',{name:/^Route 2,/}))
   fireEvent.change(screen.getByRole('slider'),{target:{value:'12'}})
   fireEvent.click(screen.getByLabelText('Weather heatmap'))
   fireEvent.click(screen.getByLabelText('Checkpoints',{exact:true}))
   fireEvent.click(screen.getByRole('button',{name:'Checkpoint details'}))
-  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.queryByText('Update needed')).not.toBeInTheDocument()
   expect(api).toHaveBeenCalledTimes(2)
 })
 
-it('allows retrying a failed changed trip and disables Compare after that retry succeeds',async()=>{
+it('retains the update mark after failure and clears it after a successful retry',async()=>{
   const live=await showLivePlan()
   fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
   vi.mocked(api).mockRejectedValueOnce(new ApiError('Weather is temporarily unavailable.',503,'provider_timeout'))
   await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
   expect(screen.getByRole('alert')).toHaveTextContent('Weather is temporarily unavailable.')
   expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.getByText('Update needed')).toBeInTheDocument()
   vi.mocked(api).mockResolvedValueOnce({...live,spacing_miles:10})
   await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Compare live routes'})))
-  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.queryByText('Update needed')).not.toBeInTheDocument()
   expect(api).toHaveBeenCalledTimes(4)
 })
 
@@ -196,8 +207,10 @@ it('keeps edits made during an in-flight comparison eligible for another compari
   await act(async()=>resolve({...live,spacing_miles:10}))
   expect(screen.getByRole('button',{name:'50 miles'})).toHaveAttribute('aria-pressed','true')
   expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.getByText('Update needed')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button',{name:'10 miles'}))
-  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeDisabled()
+  expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
+  expect(screen.queryByText('Update needed')).not.toBeInTheDocument()
 })
 
 it('requires valid trip inputs and a selected city before enabling a new live comparison',async()=>{

@@ -98,11 +98,11 @@ export default function App(){
     !parsedDeparture?'Choose a valid, unambiguous departure time at the origin.':
     departureMs<Math.floor(now/60000)*60000||departureMs>Math.floor((now+7*86400000)/60000)*60000?'Choose a departure between now and seven days from now.':
     !Number.isInteger(load)||load<0||load>100000?'Enter a whole-number load between 0 and 100,000 lb.':''
-  const hasNewInformation=!plan||plan.mode==='example'||dirty
-  const canCompare=!busy&&retryAfter===0&&!invalidInput&&hasNewInformation
+  const canCompare=!busy&&retryAfter===0&&!invalidInput
+  const showUpdateBadge=dirty&&!busy
   const compareHelp=busy?'Checking roads and weather…':retryAfter>0?`Please wait ${retryAfter} seconds before trying again.`:invalidInput||
-    (!hasNewInformation?'Live results match these inputs. Change a trip setting to compare again.':
-      dirty?'Trip changed. Compare to update roads and weather.':'Compare to fetch live roads and weather for this trip.')
+    (dirty?'Trip changed. Compare to update roads and weather.':
+      plan?.mode==='live'?'Live results shown. Compare again to recheck this trip.':'Compare to fetch live roads and weather for this trip.')
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span><div className="topbar-right"><span className="assessment-tag">Built for Spotter</span><button className="icon-button" aria-label="How route recommendations work" onClick={()=>setMethod(true)}><Info size={19}/></button><span className="avatar">HH</span></div></header>
     <div className="workspace">
@@ -115,7 +115,7 @@ export default function App(){
           <div className="load-heading"><label htmlFor="load">Load weight</label><Truck size={15}/></div><div className="weight-input"><input id="load" type="number" min="0" max="100000" step="1" required value={load} onChange={e=>setLoad(Number(e.target.value))}/><span>lb</span></div>
           <div className="spacing-heading"><label>Weather checkpoints</label><span>Every</span></div><div className="segmented" role="group" aria-label="Checkpoint spacing">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} miles</button>)}</div>
           <label className="fallback-option"><input type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)}/>Allow car-profile comparison</label><p className="fallback-help">Long trips only. Truck restrictions are not checked.</p>
-          <button type="submit" className="primary-button" disabled={!canCompare} aria-busy={busy} aria-describedby="compare-help">{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<>Compare live routes<ArrowRight size={17}/></>}</button>
+          <button type="submit" className={`primary-button${showUpdateBadge?' has-updates':''}`} disabled={!canCompare} aria-busy={busy} aria-describedby="compare-help">{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<span className="compare-button-label">Compare live routes<ArrowRight size={17}/></span>}{showUpdateBadge&&<span className="compare-update-badge" aria-hidden="true">Update needed</span>}</button>
           <p id="compare-help" className="compare-help">{compareHelp}</p>
           <button type="button" className="example-button" onClick={()=>void example()} disabled={busy}><FlaskConical size={14}/>Load example scenario</button>
         </form>

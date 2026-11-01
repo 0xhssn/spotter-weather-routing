@@ -25,7 +25,7 @@ make backend
 make frontend
 ```
 
-Open http://localhost:5173. The initial screen is a **labeled example** with three recorded LA–Phoenix road routes and simulated weather. **Compare live routes** calls the real providers; a failed provider never silently becomes example data. City search supports cities and postal codes, not street addresses. Compare is enabled for valid new or changed trip inputs, including fetching live data from the example. It is disabled while comparing, during rate-limit cooldowns, and when displayed live results already match the inputs. Reverting an edit disables it again; forecast viewing and map controls use the loaded data. Failed changed-trip requests remain retryable.
+Open http://localhost:5173. The initial screen is a **labeled example** with three recorded LA–Phoenix road routes and simulated weather. **Compare live routes** calls the real providers; a failed provider never silently becomes example data. City search supports cities and postal codes, not street addresses. Compare remains available for valid inputs, including repeated checks of the same trip. Changed fields add an **Update needed** badge to the button; successful comparison or reverting the edit clears it. Requests in progress, rate-limit cooldowns and invalid/incomplete inputs temporarily disable the button. Forecast viewing and map controls use loaded data and do not mark the trip changed. Failed changed-trip requests keep the update badge and remain retryable. Repeated comparisons may reuse the existing five-minute complete-plan cache.
 
 ## Docker
 
