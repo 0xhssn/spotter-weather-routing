@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .budget import provider_budget
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .providers import ProviderError, geocode
 from .service import build_plan
@@ -150,3 +150,10 @@ def example(request):
     spacing = int(request.GET.get("spacing_miles", 25))
     if spacing not in (10, 25, 50): raise ValueError("Checkpoint spacing must be 10, 25 or 50 miles.")
     return JsonResponse(build_plan({}, {}, departure, load, spacing, example=True))
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def access(request):
+    # GET advertises the gate; POST is verified by middleware before this view.
+    return JsonResponse({'password_required': bool(settings.DEMO_ACCESS_PASSWORD_SHA256)})

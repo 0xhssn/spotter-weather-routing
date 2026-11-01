@@ -24,7 +24,7 @@ class StaticFrontendCorsTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Access-Control-Allow-Origin'], ORIGIN)
         self.assertEqual(set(response['Access-Control-Allow-Methods'].split(', ')), {'GET', 'POST', 'OPTIONS'})
-        self.assertEqual(response['Access-Control-Allow-Headers'], 'content-type')
+        self.assertEqual(set(response['Access-Control-Allow-Headers'].split(', ')), {'content-type', 'authorization'})
 
     def test_other_sites_do_not_receive_cors_permission(self):
         response = self.client.get('/api/health', HTTP_ORIGIN='https://other.example.test')

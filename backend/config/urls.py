@@ -3,6 +3,7 @@ from planner import views
 
 urlpatterns = [
     path("api/health", views.health),
+    path("api/access", views.access),
     path("api/places", views.places),
     path("api/plan", views.plan),
     path("api/example", views.example),

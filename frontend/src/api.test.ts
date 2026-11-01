@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { api } from './api'
+import { api, setDemoPassword } from './api'
 
-afterEach(() => {vi.unstubAllGlobals();vi.unstubAllEnvs()})
+afterEach(() => {setDemoPassword('');vi.unstubAllGlobals();vi.unstubAllEnvs()})
 
 it('shows a useful service error when the reverse proxy returns HTML', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<h1>Bad Gateway</h1>', {status: 502})))
@@ -38,4 +38,18 @@ it('still validates plan data when using a separate API origin',async()=>{
   vi.stubEnv('VITE_API_BASE_URL','https://api.example.test')
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('{}',{status:200})))
   await expect(api('/api/example')).rejects.toMatchObject({code:'invalid_response'})
+})
+
+it('does not let an old unauthorized response clear newly entered credentials',async()=>{
+  let finish!:(response:Response)=>void
+  const fetch=vi.fn().mockImplementationOnce(()=>new Promise<Response>(resolve=>{finish=resolve}))
+    .mockResolvedValueOnce(new Response('{"status":"ok"}',{status:200}))
+  vi.stubGlobal('fetch',fetch)
+  setDemoPassword('old-password')
+  const pending=api('/api/example')
+  setDemoPassword('new-password')
+  finish(new Response('{"error":"Expired"}',{status:401}))
+  await expect(pending).rejects.toMatchObject({status:401})
+  await api('/api/health')
+  expect(fetch.mock.calls[1][1].headers.get('Authorization')).toBe('Bearer new-password')
 })
