@@ -24,11 +24,11 @@ class ProviderErrorTests(SimpleTestCase):
             with self.subTest(code=code):
                 cache.clear()
                 response=httpx.Response(400,request=httpx.Request('GET','https://router.example'),json=data)
-                with patch('planner.providers.httpx.get',return_value=response),self.assertRaises(ProviderError) as raised:
+                with patch('planner.providers._get_response',return_value=response),self.assertRaises(ProviderError) as raised:
                     get_json('https://router.example',{})
                 self.assertEqual((raised.exception.status,raised.exception.code),(422,code))
 
-    @patch('planner.providers.httpx.get',side_effect=httpx.ReadTimeout('timeout'))
+    @patch('planner.providers._get_response',side_effect=httpx.ReadTimeout('timeout'))
     def test_timeouts_are_service_errors(self,_):
         with self.assertRaises(ProviderError) as raised:get_json('https://router.example',{})
         self.assertEqual((raised.exception.status,raised.exception.code),(503,'provider_timeout'))
@@ -55,7 +55,7 @@ class ProviderErrorTests(SimpleTestCase):
             remaining=parallel_map(lambda _:seconds_left(),range(3))
         self.assertTrue(all(0<value<=.5 for value in remaining))
 
-    @patch('planner.providers.httpx.get')
+    @patch('planner.providers._get_response')
     def test_expired_budget_does_not_call_upstream(self,get):
         with provider_budget(0),self.assertRaises(ProviderError):get_json('https://router.example',{})
         get.assert_not_called()
@@ -170,7 +170,7 @@ class SearchAndRetryTests(SimpleTestCase):
         self.assertEqual(result[0]['timezone'],'America/Phoenix')
 
     @patch('planner.providers.time.sleep')
-    @patch('planner.providers.httpx.get')
+    @patch('planner.providers._get_response')
     def test_transient_provider_failure_gets_only_one_bounded_retry(self,get,sleep):
         request=httpx.Request('GET','https://router.example')
         get.side_effect=[httpx.Response(503,request=request,json={'error':'temporary'}),httpx.Response(200,request=request,json={'ok':True})]
@@ -179,7 +179,7 @@ class SearchAndRetryTests(SimpleTestCase):
         sleep.assert_called_once_with(.25)
 
     @patch('planner.providers.time.sleep')
-    @patch('planner.providers.httpx.get')
+    @patch('planner.providers._get_response')
     def test_long_retry_after_is_respected_without_blocking_the_request(self,get,sleep):
         get.return_value=httpx.Response(429,request=httpx.Request('GET','https://router.example'),json={},headers={'Retry-After':'60'})
         with self.assertRaises(ProviderError):get_json('https://router.example',{})

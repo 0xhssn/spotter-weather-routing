@@ -1,7 +1,9 @@
+import asyncio
 import hashlib
 import json
 import math
 import time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .budget import parallel_map, seconds_left
 
 import httpx
@@ -29,20 +31,37 @@ def provider_failure(data, status):
         raise ProviderError('The provider cannot plan this trip. Check the locations, distance and departure time.', 422, 'unsupported_trip')
 
 
-def get_json(url, params, ttl=600):
+def _get_response(url, params, timeout):
+    async def request():
+        # wait_for cancels the HTTP operation, including a slowly streaming body.
+        # A socket read timeout alone only limits the gap between received chunks.
+        async with httpx.AsyncClient(timeout=timeout, headers={
+            'User-Agent': 'SpotterAssessment/1.0 (weather-route-planner)',
+            'X-Client-Id': settings.ROUTING_CLIENT_ID,
+        }) as client:
+            return await client.get(url, params=params)
+
+    async def bounded_request():
+        return await asyncio.wait_for(request(), timeout)
+
+    return asyncio.run(bounded_request())
+
+
+def get_json(url, params, ttl=600, validate=None):
     key = hashlib.sha256((url + json.dumps(params, sort_keys=True)).encode()).hexdigest()
     cached = cache.get(key)
     if cached is not None:
-        return cached
+        try:
+            return validate(cached) if validate else cached
+        except ProviderError:
+            # Also recover from entries written by an older application version.
+            cache.delete(key)
     for attempt in range(2):
         remaining = seconds_left()
         if remaining < .1:
             raise ProviderError('The comparison reached its time limit. Try again; completed provider requests are cached.', code='provider_timeout')
         try:
-            response = httpx.get(url, params=params, timeout=min(8, remaining), headers={
-                'User-Agent': 'SpotterAssessment/1.0 (weather-route-planner)',
-                'X-Client-Id': settings.ROUTING_CLIENT_ID,
-            })
+            response = _get_response(url, params, min(8, remaining))
             if response.status_code in (429, 502, 503, 504) and attempt == 0:
                 try: delay = max(.25, float(response.headers.get('Retry-After', '.25')))
                 except ValueError: delay = .25
@@ -56,24 +75,49 @@ def get_json(url, params, ttl=600):
             provider_failure(value, response.status_code)
             if isinstance(value, dict) and value.get('error'):
                 raise ProviderError('The weather service cannot cover this request. Choose an earlier departure or shorter trip.', 422, 'forecast_unavailable')
-        except httpx.TimeoutException as exc:
+        except (httpx.TimeoutException, TimeoutError) as exc:
             if attempt == 0 and seconds_left() > 2:
                 continue
             raise ProviderError('A provider timed out. Try again shortly.', code='provider_timeout') from exc
         except httpx.HTTPError as exc:
             raise ProviderError('A routing or weather service is unavailable. Try again shortly.') from exc
+        if validate:
+            value = validate(value)
         cache.set(key, value, ttl)
         return value
 
 
-def geocode(query):
-    data = get_json(settings.GEOCODING_BASE_URL + "/v1/search", {"name": query, "count": 6, "language": "en", "format": "json", "countryCode": settings.GEOCODING_COUNTRY}, ttl=86400)
+def validate_places(data):
     try:
-        return [{"id": str(p["id"]), "label": ", ".join(filter(None, [p["name"], p.get("admin1"), p.get("country_code")])),
-                 "lat": p["latitude"], "lon": p["longitude"], "timezone": p.get("timezone", "UTC")}
-                for p in data.get("results", [])]
-    except (AttributeError, TypeError, KeyError) as exc:
-        raise ProviderError("City search returned incomplete data. Try again shortly.") from exc
+        if not isinstance(data, dict) or not isinstance(data.get('results', []), list):
+            raise ValueError('Invalid city results.')
+        for place in data.get('results', []):
+            if not isinstance(place, dict) or not isinstance(place['name'], str) or not place['name'].strip():
+                raise ValueError('Invalid city name.')
+            if not isinstance(place['id'], (str, int)) or isinstance(place['id'], bool):
+                raise ValueError('Invalid city ID.')
+            for field, limit in (('latitude', 85), ('longitude', 180)):
+                value = place[field]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -limit <= value <= limit:
+                    raise ValueError('Invalid city coordinates.')
+            for field in ('admin1', 'country_code'):
+                if place.get(field) is not None and not isinstance(place[field], str):
+                    raise ValueError('Invalid city label.')
+            zone = place['timezone']
+            if not isinstance(zone, str) or not zone:
+                raise ValueError('Missing city timezone.')
+            ZoneInfo(zone)
+        return data
+    except (AttributeError, TypeError, KeyError, ValueError, ZoneInfoNotFoundError) as exc:
+        raise ProviderError('City search returned invalid location data. Try again shortly.') from exc
+
+
+def geocode(query):
+    data = get_json(settings.GEOCODING_BASE_URL + "/v1/search", {"name": query, "count": 6, "language": "en", "format": "json", "countryCode": settings.GEOCODING_COUNTRY}, ttl=86400, validate=validate_places)
+    validate_places(data)
+    return [{"id": str(p["id"]), "label": ", ".join(filter(None, [p["name"], p.get("admin1"), p.get("country_code")])),
+             "lat": p["latitude"], "lon": p["longitude"], "timezone": p['timezone']}
+            for p in data.get("results", [])]
 
 
 def route_payload(data):
@@ -83,7 +127,21 @@ def route_payload(data):
     routes = data.get("routes")
     if not isinstance(routes, list) or not routes:
         raise ProviderError("The routing service returned no routes. Try different locations.")
-    return routes
+    valid = []
+    for route in routes[:3]:
+        try:
+            parsed_route(route, len(valid))
+        except ProviderError:
+            continue
+        valid.append(route)
+    if not valid:
+        raise ProviderError('The routing service returned invalid road geometry or travel times. Try again shortly.')
+    return valid
+
+
+def validate_routes(data):
+    routes = route_payload(data)
+    return {**data, 'routes': routes}
 
 
 def _osrm(coords, alternatives=2):
@@ -91,7 +149,7 @@ def _osrm(coords, alternatives=2):
     data = get_json(settings.OSRM_BASE_URL + "/route/v1/driving/" + coordinate_string, {
         "alternatives": alternatives, "steps": "true", "geometries": "geojson", "overview": "full",
         "radiuses": ";".join("10000" for _ in coords),
-    }, ttl=3600)
+    }, ttl=3600, validate=validate_routes)
     return route_payload(data)
 
 
@@ -117,7 +175,7 @@ def routing_request(coords, alternatives, load_lb):
     # Compact JSON also avoids '+'-encoded whitespace rejected by some servers.
     data = get_json(settings.VALHALLA_BASE_URL + "/route", {
         "json": json.dumps(query, separators=(",", ":")),
-    }, ttl=3600)
+    }, ttl=3600, validate=validate_routes)
     return route_payload(data)
 
 
@@ -157,7 +215,12 @@ def fetch_routes(origin, destination, load_lb, allow_road_fallback=False):
         routes.append(parsed)
         fingerprints.append(fp)
     for candidate in raw[:3]:
-        add_route(candidate)
+        try:
+            add_route(candidate)
+        except ProviderError:
+            continue
+    if not routes:
+        raise ProviderError('The routing service returned invalid road geometry or travel times. Try again shortly.')
     # The alternative-route API may return fewer than three. Request bounded,
     # road-routed detours instead of duplicating or fabricating route geometry.
     if len(routes) < 3 and not road_profile:
@@ -239,6 +302,14 @@ def validate_forecast(item, start, end):
 
 def fetch_weather(points, start, end):
     def batch(chunk):
+        def validate_batch(data):
+            items = data if isinstance(data, list) else [data]
+            if len(items) != len(chunk):
+                raise ProviderError("Weather provider returned incomplete location coverage.")
+            for item in items:
+                validate_forecast(item, start, end)
+            return data
+
         data = get_json(settings.WEATHER_BASE_URL + "/v1/forecast", {
             "latitude": ",".join(str(p[1]) for p in chunk),
             "longitude": ",".join(str(p[0]) for p in chunk),
@@ -246,7 +317,7 @@ def fetch_weather(points, start, end):
             "wind_speed_unit": "mph", "temperature_unit": "fahrenheit", "precipitation_unit": "mm",
             "timeformat": "unixtime", "timezone": "GMT",
             "start_hour": start.strftime("%Y-%m-%dT%H:00"), "end_hour": end.strftime("%Y-%m-%dT%H:00"),
-        })
+        }, validate=validate_batch)
         data = data if isinstance(data, list) else [data]
         if len(data) != len(chunk):
             raise ProviderError("Weather provider returned incomplete location coverage.")
