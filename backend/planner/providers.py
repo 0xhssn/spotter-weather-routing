@@ -1,7 +1,8 @@
 import hashlib
 import json
 import math
-from concurrent.futures import ThreadPoolExecutor
+import time
+from .budget import parallel_map, seconds_left
 
 import httpx
 from django.conf import settings
@@ -11,7 +12,21 @@ from .geometry import distance, parse_osrm_route, sample
 
 
 class ProviderError(Exception):
-    pass
+    def __init__(self, message, status=503, code='provider_unavailable'):
+        super().__init__(message)
+        self.status, self.code = status, code
+
+
+def provider_failure(data, status):
+    code = str(data.get('code', data.get('error_code', ''))) if isinstance(data, dict) else ''
+    if code in ('154', 'DistanceExceeded', 'TooBig'):
+        raise ProviderError('This truck router cannot cover this trip distance. Enable the optional car-profile comparison, or use a truck router with a higher distance limit.', 422, 'route_too_long')
+    if code in ('170', '171', '172', 'NoRoute', 'NoSegment', 'NoSuchRoute'):
+        raise ProviderError('No drivable route connects these places. Choose locations on a connected road network.', 422, 'no_route')
+    if status == 429 or status >= 500:
+        raise ProviderError('A routing or weather service is temporarily unavailable or rate-limited. Try again shortly.')
+    if status >= 400:
+        raise ProviderError('The provider cannot plan this trip. Check the locations, distance and departure time.', 422, 'unsupported_trip')
 
 
 def get_json(url, params, ttl=600):
@@ -19,23 +34,40 @@ def get_json(url, params, ttl=600):
     cached = cache.get(key)
     if cached is not None:
         return cached
-    try:
-        response = httpx.get(url, params=params, timeout=25, headers={
-            "User-Agent": "SpotterAssessment/1.0 (weather-route-planner)",
-            "X-Client-Id": settings.ROUTING_CLIENT_ID,
-        })
-        response.raise_for_status()
-        value = response.json()
-        if isinstance(value, dict) and value.get("error"):
-            raise ProviderError("The provider could not process this request. Try a shorter trip or another departure time.")
-    except (httpx.HTTPError, ValueError) as exc:
-        raise ProviderError("A routing or weather service is unavailable or rate-limited. Try again shortly, or load the example scenario.") from exc
-    cache.set(key, value, ttl)
-    return value
+    for attempt in range(2):
+        remaining = seconds_left()
+        if remaining < .1:
+            raise ProviderError('The comparison reached its time limit. Try again; completed provider requests are cached.', code='provider_timeout')
+        try:
+            response = httpx.get(url, params=params, timeout=min(8, remaining), headers={
+                'User-Agent': 'SpotterAssessment/1.0 (weather-route-planner)',
+                'X-Client-Id': settings.ROUTING_CLIENT_ID,
+            })
+            if response.status_code in (429, 502, 503, 504) and attempt == 0:
+                try: delay = max(.25, float(response.headers.get('Retry-After', '.25')))
+                except ValueError: delay = .25
+                if delay <= 2 and seconds_left() > delay+1:
+                    time.sleep(delay)
+                    continue
+            try:
+                value = response.json()
+            except ValueError as exc:
+                raise ProviderError('A provider returned an unreadable response. Try again shortly.') from exc
+            provider_failure(value, response.status_code)
+            if isinstance(value, dict) and value.get('error'):
+                raise ProviderError('The weather service cannot cover this request. Choose an earlier departure or shorter trip.', 422, 'forecast_unavailable')
+        except httpx.TimeoutException as exc:
+            if attempt == 0 and seconds_left() > 2:
+                continue
+            raise ProviderError('A provider timed out. Try again shortly.', code='provider_timeout') from exc
+        except httpx.HTTPError as exc:
+            raise ProviderError('A routing or weather service is unavailable. Try again shortly.') from exc
+        cache.set(key, value, ttl)
+        return value
 
 
 def geocode(query):
-    data = get_json(settings.GEOCODING_BASE_URL + "/v1/search", {"name": query, "count": 6, "language": "en", "format": "json"}, ttl=86400)
+    data = get_json(settings.GEOCODING_BASE_URL + "/v1/search", {"name": query, "count": 6, "language": "en", "format": "json", "countryCode": settings.GEOCODING_COUNTRY}, ttl=86400)
     try:
         return [{"id": str(p["id"]), "label": ", ".join(filter(None, [p["name"], p.get("admin1"), p.get("country_code")])),
                  "lat": p["latitude"], "lon": p["longitude"], "timezone": p.get("timezone", "UTC")}
@@ -45,8 +77,9 @@ def geocode(query):
 
 
 def route_payload(data):
+    provider_failure(data, 200)
     if not isinstance(data, dict) or data.get("code") != "Ok":
-        raise ProviderError("No connected road route was found between these locations.")
+        raise ProviderError("No drivable route connects these places.", 422, "no_route")
     routes = data.get("routes")
     if not isinstance(routes, list) or not routes:
         raise ProviderError("The routing service returned no routes. Try different locations.")
@@ -95,14 +128,24 @@ def parsed_route(raw, index):
         raise ProviderError("The routing service returned invalid road geometry or travel times. Try again shortly.") from exc
 
 
-def fetch_routes(origin, destination, load_lb):
+def fetch_routes(origin, destination, load_lb, allow_road_fallback=False):
     start, end = (origin["lon"], origin["lat"]), (destination["lon"], destination["lat"])
-    raw = routing_request([start, end], 2, load_lb)
+    road_profile = settings.ROUTING_PROVIDER == 'osrm'
+    def request(coords, alternatives):
+        return _osrm(coords, alternatives) if road_profile else routing_request(coords, alternatives, load_lb)
+    try:
+        raw = request([start, end], 2)
+    except ProviderError as exc:
+        if not allow_road_fallback or exc.code != 'route_too_long':
+            raise
+        road_profile = True
+        raw = request([start, end], 2)
     if not isinstance(raw, list) or not raw:
         raise ProviderError("The routing service returned no routes.")
     routes, fingerprints = [], []
     def add_route(candidate, detour=False):
         parsed = parsed_route(candidate, len(routes))
+        parsed["routing_profile"] = "car" if road_profile else "truck"
         if routes and (parsed["distance_m"] > routes[0]["distance_m"] * 1.65
                        or parsed["duration_s"] > routes[0]["duration_s"] * 1.8):
             return
@@ -117,7 +160,7 @@ def fetch_routes(origin, destination, load_lb):
         add_route(candidate)
     # The alternative-route API may return fewer than three. Request bounded,
     # road-routed detours instead of duplicating or fabricating route geometry.
-    if len(routes) < 3:
+    if len(routes) < 3 and not road_profile:
         midpoint = ((start[0]+end[0])/2, (start[1]+end[1])/2)
         dx = (end[0]-start[0]) * math.cos(math.radians(midpoint[1]))
         dy = end[1]-start[1]
@@ -126,7 +169,7 @@ def fetch_routes(origin, destination, load_lb):
         def detour(signed_offset):
             via = (midpoint[0] - dy/norm*signed_offset/max(.1, math.cos(math.radians(midpoint[1]))), midpoint[1] + dx/norm*signed_offset)
             try:
-                return routing_request([start, via, end], 0, load_lb)[0]
+                return request([start, via, end], 0)[0]
             except ProviderError:
                 return None
         # Try a second, wider corridor only if nearby waypoints snap back onto
@@ -134,8 +177,9 @@ def fetch_routes(origin, destination, load_lb):
         for width in (offset, offset*2.4):
             if len(routes) == 3:
                 break
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                candidates = list(pool.map(detour, [-width, width]))
+            if seconds_left() < 3:
+                break
+            candidates = parallel_map(detour, [-width, width], workers=2)
             for candidate in candidates:
                 if candidate is None or len(routes) == 3:
                     continue
@@ -144,7 +188,23 @@ def fetch_routes(origin, destination, load_lb):
                 except ProviderError:
                     # A failed optional detour must not discard valid main routes.
                     continue
+    label_routes(routes)
     return routes
+
+
+def label_routes(routes):
+    primary = set(routes[0].get("roads", {}))
+    base_lat = sum(v[1] for v in routes[0]["vertices"])/len(routes[0]["vertices"])
+    used = set()
+    for index, route in enumerate(routes):
+        unique = sorted(((name, length) for name, length in route.get("roads", {}).items() if name not in primary), key=lambda item: -item[1])
+        if index:
+            latitude = sum(v[1] for v in route["vertices"])/len(route["vertices"])
+            corridor = "Northern" if latitude > base_lat else "Southern"
+            route["via"] = " · ".join(name for name, _ in unique[:2]) or f"{corridor} corridor · {route['via'].removeprefix('Via alternate corridor · ')}"
+        if route["via"] in used:
+            route["via"] += f" · Alternative {index+1}"
+        used.add(route["via"])
 
 
 WEATHER_UNITS = {"time": "unixtime", "wind_speed_10m": "mp/h", "wind_gusts_10m": "mp/h",
@@ -193,9 +253,8 @@ def fetch_weather(points, start, end):
         for point, item in zip(chunk, data):
             result[point] = validate_forecast(item, start, end)
         return result
-    chunks = [points[i:i+35] for i in range(0, len(points), 35)]
+    chunks = [points[i:i+100] for i in range(0, len(points), 100)]
     result = {}
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        for item in pool.map(batch, chunks):
-            result.update(item)
+    for item in parallel_map(batch, chunks):
+        result.update(item)
     return result

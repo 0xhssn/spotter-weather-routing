@@ -14,3 +14,13 @@ it('leaves areas outside the trip corridor transparent', () => {
   const {pixels}=riskRaster([{x:5,y:5,score:4}],100,100,10)
   expect(pixels.slice(-4)).toEqual(new Uint8ClampedArray(4))
 })
+
+it('makes low risk nearly transparent and dangerous areas stronger and larger',()=>{
+  const low=riskRaster([{x:33,y:33,score:0}],100,100,30)
+  const blocked=riskRaster([{x:33,y:33,score:4}],100,100,30)
+  const center=(5*blocked.columns+5)*4+3
+  expect(low.pixels[center]).toBeLessThanOrEqual(12)
+  expect(blocked.pixels[center]).toBeGreaterThanOrEqual(200)
+  const count=(pixels:Uint8ClampedArray)=>Array.from(pixels).filter((n,i)=>i%4===3&&n>0).length
+  expect(count(blocked.pixels)).toBeGreaterThan(count(low.pixels))
+})

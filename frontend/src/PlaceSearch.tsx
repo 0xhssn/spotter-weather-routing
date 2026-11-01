@@ -38,7 +38,7 @@ export function PlaceSearch({label,value,onChange}:{label:string;value:Place|nul
   const select=(place:Place)=>{editing.current=false;onChange(place);setText(place.label);setOpen(false);setActive(-1);setError('')}
   return <div className="place-field" ref={ref}>
     <label htmlFor={id}>{label}</label>
-    <div className="input-icon"><MapPin size={16}/><input id={id} role="combobox" aria-autocomplete="list" aria-expanded={open && results.length>0} aria-controls={open && results.length?`${id}-results`:undefined} aria-activedescendant={open && results[active]?`${id}-${active}`:undefined} value={text} placeholder="Search a city or postal code" autoComplete="off"
+    <div className="input-icon"><MapPin size={16}/><input id={id} role="combobox" aria-autocomplete="list" aria-expanded={open && results.length>0} aria-controls={open && results.length?`${id}-results`:undefined} aria-activedescendant={open && results[active]?`${id}-${active}`:undefined} value={text} placeholder="Search a US city or postal code" autoComplete="off"
       onFocus={()=>{if(results.length) setOpen(true)}}
       onChange={e=>{editing.current=true;setText(e.target.value);setResults([]);setActive(-1);setError('');onChange(null);setOpen(true)}}
       onKeyDown={e=>{

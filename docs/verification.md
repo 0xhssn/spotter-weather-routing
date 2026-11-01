@@ -49,3 +49,8 @@ Remaining assignment delivery gaps: hosted application and 5–10 minute Loom wa
 - Re-ran all 34 backend tests, 13 frontend tests, the production build, and Django system checks successfully before the initial commit.
 - Reviewed the 54-file initial source inventory for credential patterns. Local `.env`, environment variants, virtualenv, dependencies, build outputs, and caches are excluded; `.env.example` is included.
 - Hosting, the Loom recording, reviewer access and the questionnaire submission remain pending.
+
+
+## QA brief follow-up — November 1, 2026
+
+See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expanded 85-test regression suite, live long-haul checks, render measurements and deterministic risk-state screenshots. This supersedes earlier application limits, timing display and test counts.

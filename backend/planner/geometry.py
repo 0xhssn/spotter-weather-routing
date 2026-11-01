@@ -21,11 +21,15 @@ def parse_osrm_route(raw: dict, index: int) -> dict:
     total_distance = number(raw["distance"], positive=True)
     total_duration = number(raw["duration"], positive=True)
     vertices = []
+    roads = {}
     walked = elapsed = 0.0
     for leg in raw["legs"]:
         for step in leg["steps"]:
             coords = step["geometry"]["coordinates"]
             step_distance, step_duration = number(step["distance"]), number(step["duration"])
+            name = (step.get('ref') or step.get('name') or '').strip()
+            if name:
+                roads[name] = roads.get(name, 0)+step_distance
             if not coords:
                 raise ValueError("Routing provider returned missing road geometry.")
             for point in coords:
@@ -63,7 +67,7 @@ def parse_osrm_route(raw: dict, index: int) -> dict:
     return {
         "id": f"route-{index + 1}", "name": f"Route {index + 1}",
         "via": " · ".join(leg.get("summary", "") for leg in raw["legs"]) or "Road corridor",
-        "distance_m": raw["distance"], "duration_s": raw["duration"], "vertices": vertices,
+        "distance_m": raw["distance"], "duration_s": raw["duration"], "vertices": vertices, "roads": roads,
     }
 
 
@@ -73,7 +77,9 @@ def point_at(route, meters):
         return list(vs[0])
     if meters >= route["distance_m"]:
         return list(vs[-1])
-    ds = [v[2] for v in vs]
+    ds = route.get("_distances")
+    if ds is None:
+        ds = route["_distances"] = [v[2] for v in vs]
     index = max(1, min(len(vs)-1, bisect.bisect_left(ds, meters)))
     a, b = vs[index-1], vs[index]
     ratio = (meters - a[2]) / (b[2] - a[2]) if b[2] > a[2] else 0
@@ -91,11 +97,11 @@ def weather_key(lon, lat):
     return round(lon, 3), round(lat, 3)
 
 
-def corridor_grid(routes):
+def corridor_grid(routes, interval_miles=40):
     """Three lanes across a +/-20 mile corridor, sampled every 40 miles."""
     points = set()
     for route in routes:
-        for v in sample(route, 40):
+        for v in sample(route, interval_miles):
             ahead = point_at(route, min(route["distance_m"], v[2] + MILE_M))
             behind = point_at(route, max(0, v[2] - MILE_M))
             dx = (ahead[0] - behind[0]) * math.cos(math.radians(v[1]))
@@ -107,3 +113,30 @@ def corridor_grid(routes):
                 if -90 <= lat <= 90 and -180 <= lon <= 180:
                     points.add(weather_key(lon, lat))
     return sorted(points)
+
+
+def simplify_geometry(vertices, tolerance=60):
+    """Douglas–Peucker display geometry in meters; scoring uses full vertices."""
+    if len(vertices) < 3:
+        return [v[:2] for v in vertices]
+    scale = math.cos(math.radians(sum(v[1] for v in vertices)/len(vertices)))
+    points = [(v[0]*111195*scale, v[1]*111195) for v in vertices]
+    keep = {0, len(points)-1}
+    stack = [(0, len(points)-1)]
+    while stack:
+        first, last = stack.pop()
+        ax, ay = points[first]
+        bx, by = points[last]
+        dx, dy = bx-ax, by-ay
+        denominator = dx*dx+dy*dy
+        maximum, farthest = tolerance*tolerance, None
+        for i in range(first+1, last):
+            x, y = points[i]
+            ratio = max(0, min(1, ((x-ax)*dx+(y-ay)*dy)/denominator)) if denominator else 0
+            squared = (x-ax-ratio*dx)**2+(y-ay-ratio*dy)**2
+            if squared > maximum:
+                maximum, farthest = squared, i
+        if farthest is not None:
+            keep.add(farthest)
+            stack.extend([(first, farthest), (farthest, last)])
+    return [vertices[i][:2] for i in sorted(keep)]

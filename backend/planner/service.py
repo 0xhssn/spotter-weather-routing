@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from django.conf import settings
 
-from .geometry import MILE_M, corridor_grid, sample, weather_key
-from .providers import ProviderError, fetch_routes, fetch_weather
+from .geometry import MILE_M, corridor_grid, sample, weather_key, simplify_geometry
+from .providers import ProviderError, fetch_routes, fetch_weather, label_routes
 from .risk import classify, recommend, summarize
 
 
@@ -37,22 +37,32 @@ def read_weather(hourly, at):
     }
 
 
-def build_plan(origin, destination, departure, load, spacing, example=False):
+def build_plan(origin, destination, departure, load, spacing, example=False, allow_road_fallback=False):
     warnings = []
     if example:
         paths = json.loads((Path(__file__).parent / "fixtures" / "routes.json").read_text())
-        origin = {"label": "Los Angeles, California, US", "lat": 34.0522, "lon": -118.2437}
-        destination = {"label": "Phoenix, Arizona, US", "lat": 33.4484, "lon": -112.074}
+        origin = {"label": "Los Angeles, California, US", "lat": 34.0522, "lon": -118.2437, "timezone": "America/Los_Angeles"}
+        destination = {"label": "Phoenix, Arizona, US", "lat": 33.4484, "lon": -112.074, "timezone": "America/Phoenix"}
         warnings.append("Example scenario: recorded road routes and simulated weather. Use Compare live routes for current forecasts.")
     else:
-        paths = fetch_routes(origin, destination, load)
-    if any(p["distance_m"] / MILE_M > 1500 for p in paths):
-        raise ValueError("This free-tier demo supports routes up to 1,500 miles. Choose closer locations.")
+        paths = fetch_routes(origin, destination, load, True) if allow_road_fallback else fetch_routes(origin, destination, load)
+    supported = [path for path in paths if path['distance_m']/MILE_M <= 5000]
+    if not supported:
+        raise ProviderError('This demo supports trips up to 5,000 miles. Choose closer locations.', 422, 'route_too_long')
+    if len(supported) < len(paths):
+        warnings.append('Some alternatives exceed the 5,000-mile demo limit; the supported routes are shown.')
+    paths = supported
+    label_routes(paths)
     sampled = [sample(path, spacing) for path in paths]
-    grid = corridor_grid(paths)
-    locations = sorted({weather_key(p[0], p[1]) for route in sampled for p in route} | set(grid))
-    if len(locations) > 650:
-        raise ValueError("Too many forecast locations. Choose 25 or 50 mile checkpoint spacing.")
+    checkpoint_locations = {weather_key(p[0], p[1]) for route in sampled for p in route}
+    grid_spacing = 40
+    grid = corridor_grid(paths, grid_spacing)
+    while len(grid) > 240 or len(checkpoint_locations | set(grid)) > 1800:
+        grid_spacing *= 2
+        grid = corridor_grid(paths, grid_spacing)
+        if grid_spacing > 10240:
+            raise ProviderError('Too many forecast locations. Choose 25 or 50 mile checkpoint spacing.', 422, 'forecast_location_limit')
+    locations = sorted(checkpoint_locations | set(grid))
     latest = max(departure + timedelta(seconds=p["duration_s"]) for p in paths)
     if latest > datetime.now(timezone.utc) + timedelta(days=15) and not example:
         raise ValueError("Arrival falls outside the forecast horizon. Choose an earlier departure.")
@@ -68,14 +78,9 @@ def build_plan(origin, destination, departure, load, spacing, example=False):
             risk = classify(weather["wind_mph"], weather["rain_in"], weather["snow_in"], load)
             checkpoints.append({"id": f"{path['id']}-cp-{i}", "lon": lon, "lat": lat,
                                 "mile": meters/MILE_M, "eta": eta.isoformat(), "weather": weather, "risk": risk})
-        vertices = path["vertices"]
-        # Keep bends on the map while capping payload size. Checkpoint interpolation
-        # above always uses the original, full road geometry.
-        stride = max(1, len(vertices)//3500)
-        coords = [[v[0], v[1]] for v in vertices[::stride]]
-        if coords[-1] != vertices[-1][:2]: coords.append(vertices[-1][:2])
+        coords = simplify_geometry(path["vertices"])
         routes.append({"id": path["id"], "name": path["name"], "via": path["via"],
-                       "distance_miles": path["distance_m"]/MILE_M, "duration_s": path["duration_s"],
+                       "routing_profile": path.get("routing_profile", "truck"), "distance_miles": path["distance_m"]/MILE_M, "duration_s": path["duration_s"],
                        "arrival": (departure+timedelta(seconds=path["duration_s"])).isoformat(),
                        "geometry": {"type": "LineString", "coordinates": coords},
                        "checkpoints": checkpoints, "summary": summarize(checkpoints, path["duration_s"])})
@@ -94,15 +99,16 @@ def build_plan(origin, destination, departure, load, spacing, example=False):
     if len(routes) < 3:
         warnings.append(f"The routing service found {len(routes)} distinct route(s). No duplicate routes have been added.")
     routing_name = "Valhalla / OpenStreetMap"
-    if not example and settings.ROUTING_PROVIDER == "osrm":
+    if not example and any(p.get("routing_profile") == "car" for p in paths):
         routing_name = "OSRM / OpenStreetMap"
-        warnings.append("Road routes use a car profile and do not validate truck height, weight restrictions, closures, or hours of service. ETAs are estimates without traffic or rest stops.")
+        warnings.append("Car-profile comparison: truck height, weight and access restrictions are NOT checked. Travel times are car estimates, without traffic or driver rest stops. Verify the route with truck navigation before driving.")
     else:
         warnings.append("Road routes assume a standard semi: 13 ft 6 in high, 8 ft 6 in wide, 71 ft long, with 30,000 lb empty weight plus cargo. Verify actual vehicle dimensions, restrictions and closures. ETAs exclude traffic and rest stops.")
     return {"mode": "example" if example else "live", "origin": origin, "destination": destination,
-            "departure": departure.isoformat(), "load_lb": load, "spacing_miles": spacing,
+            "departure": departure.isoformat(), "load_lb": load, "spacing_miles": spacing, "allow_road_fallback": allow_road_fallback,
             "routes": routes, "recommended_id": recommended, "heatmap": heatmap,
-            "forecast_hours": 48, "forecast_locations": len(locations),
+            "forecast_hours": 48, "forecast_locations": len(locations), "heatmap_spacing_miles": grid_spacing,
+            "trip_exceeds_heatmap": (latest-departure).total_seconds() > 48*3600,
             "generated_at": datetime.now(timezone.utc).isoformat(), "warnings": warnings,
             "providers": {"routing": routing_name, "weather": "Simulated example" if example else "Open-Meteo", "geocoding": "Open-Meteo / GeoNames"}}
 

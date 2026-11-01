@@ -10,14 +10,16 @@ export function riskRaster(points:ProjectedRisk[], width:number, height:number, 
   const scores=new Int8Array(columns*rows).fill(-1)
   const strength=new Float32Array(columns*rows)
   for(const point of points){
-    const minX=Math.max(0,Math.floor((point.x-radius)/cellSize))
-    const maxX=Math.min(columns-1,Math.ceil((point.x+radius)/cellSize))
-    const minY=Math.max(0,Math.floor((point.y-radius)/cellSize))
-    const maxY=Math.min(rows-1,Math.ceil((point.y+radius)/cellSize))
+    const extent=radius*[.65,.85,1,1.2,1.4][point.score]
+    const peak=[.045,.25,.4,.62,.82][point.score]
+    const minX=Math.max(0,Math.floor((point.x-extent)/cellSize))
+    const maxX=Math.min(columns-1,Math.ceil((point.x+extent)/cellSize))
+    const minY=Math.max(0,Math.floor((point.y-extent)/cellSize))
+    const maxY=Math.min(rows-1,Math.ceil((point.y+extent)/cellSize))
     for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){
-      const distance=Math.hypot((x+.5)*cellSize-point.x,(y+.5)*cellSize-point.y)/radius
+      const distance=Math.hypot((x+.5)*cellSize-point.x,(y+.5)*cellSize-point.y)/extent
       if(distance>=1)continue
-      const index=y*columns+x, alpha=Math.pow(1-distance,1.3)*.5
+      const index=y*columns+x, alpha=Math.pow(1-distance,1.1)*peak
       if(point.score>scores[index]){scores[index]=point.score;strength[index]=alpha}
       else if(point.score===scores[index])strength[index]=Math.max(strength[index],alpha)
     }

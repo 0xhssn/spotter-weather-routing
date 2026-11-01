@@ -4,4 +4,6 @@ import 'leaflet/dist/leaflet.css'
 import './styles.css'
 import App from './App'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>)
+const profiling=import.meta.env.DEV && new URLSearchParams(location.search).has('qa-profile')
+const app=<React.StrictMode><App/></React.StrictMode>
+ReactDOM.createRoot(document.getElementById('root')!).render(profiling?<React.Profiler id="app" onRender={(_,phase,duration)=>console.debug(`[waywise-profile] ${phase} react_ms=${duration.toFixed(2)}`)}>{app}</React.Profiler>:app)
