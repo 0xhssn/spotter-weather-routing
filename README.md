@@ -31,12 +31,19 @@ Open http://localhost:5173. The initial screen is a **labeled example** with thr
 
 ```sh
 cp .env.example .env
-docker compose up --build
+docker compose up --build --wait
+python3 scripts/docker_smoke.py
 ```
 
-Open http://localhost:8080. Nginx serves the built frontend and proxies `/api/` to Gunicorn/Django. No database is required: trip comparisons are read-only and have no saved accounts or trips.
+Open http://localhost:8080. Nginx serves the built frontend and proxies `/api/` to Gunicorn/Django. Both services have readiness checks; `--wait` waits for them to become healthy. The web port is bound to localhost. No database is required: trip comparisons are read-only and have no saved accounts or trips.
 
-For deployment, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_KEY`, and the real hostname in `DJANGO_ALLOWED_HOSTS`. Put the web service behind your host's TLS reverse proxy. Deployment choice and Loom recording remain follow-up steps; nothing is published by setup.
+If Compose is installed as a standalone command, use `docker-compose` instead of `docker compose`. Set `WEB_PORT` to choose another local port. `APP_ENV_FILE` selects a separate backend environment file (default `.env`); for example, use `APP_ENV_FILE=.env.production docker compose up --build --wait` after setting the production values below. Local environment files are ignored by Git and excluded from image build contexts.
+
+`python3 scripts/docker_smoke.py` checks the built HTML/JavaScript, Nginx readiness, the proxied Django health endpoint and the complete synthetic example forecast without calling external providers. Use `--base-url` if the port differs. Stop this stack with `docker compose down`.
+
+For deployment, set `DJANGO_DEBUG=false`, a random `DJANGO_SECRET_KEY`, and the real hostname in `DJANGO_ALLOWED_HOSTS`. Put the web service behind your host's TLS reverse proxy. Cloud deployment and Loom recording remain follow-up steps; nothing is published by setup.
+
+For a short assessment deployment, Render compute is [prorated by the second](https://render.com/docs/faq), with a $0/month Hobby workspace and no required database or persistent disk. At the [published $7/month price per small instance](https://render.com/pricing), two instances for 7 or 14 days are approximately $3.27 or $6.53 in compute using a 30-day month, before extra bandwidth/build usage and tax. These are estimates, not prepaid weekly packages. Suspend or delete **both** services after the review (within 14 days); they continue billing while active. Record the actual start and shutdown dates when deploying.
 
 ## Features
 
@@ -130,4 +137,4 @@ To reproduce the risk states without waiting for dangerous live weather, run `.v
 
 For development render measurements, add `?qa-profile=1` to the normal frontend URL. Console messages record React commit duration and heatmap canvas draw duration. Production builds remove this diagnostic behavior. The automated tests assert that forecast ticks do not render the route cards, recommendation, or open checkpoint table.
 
-GitHub Actions runs the backend tests, frontend tests, Django checks and production build on pushes to main and pull requests (`.github/workflows/ci.yml`).
+GitHub Actions runs the backend tests, frontend tests, Django checks and production build on pushes to main and pull requests (`.github/workflows/ci.yml`). A separate container job generates an ephemeral production secret, builds both images, waits for both services to be healthy, runs the Docker smoke checks and always stops the stack.

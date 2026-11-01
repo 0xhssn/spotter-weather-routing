@@ -54,3 +54,15 @@ Remaining assignment delivery gaps: hosted application and 5–10 minute Loom wa
 ## QA brief follow-up — November 1, 2026
 
 See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expanded 86-test regression suite, live long-haul checks, render measurements and deterministic risk-state screenshots. This supersedes earlier application limits, timing display and test counts.
+
+
+## Main synchronization and Docker verification - November 2, 2026
+
+- Merged the remote provider-recovery change with all six local UI commits and pushed `0ee5063` to main. The only Git conflict was the README validation paragraph; both sets of coverage are retained. Updated recovery tests to the current stale-result behavior and canonical example inputs.
+- The combined code passes 68 backend tests and 82 frontend tests, Django checks, the typography guard and production build. GitHub regression run [41331165133](https://github.com/0xhssn/spotter-weather-routing/actions/runs/41331165133) also passed.
+- Docker Desktop was running. Built the Python/Gunicorn backend and Node-to-Nginx frontend from the lockfiles on local Linux/ARM64 Docker. Both services reached healthy status. This supersedes the earlier unverified-container note.
+- Verified production mode (`DJANGO_DEBUG=false`) and non-root backend UID 1000 using an isolated, mode-600 environment file outside the repository. The existing local development environment was retained.
+- The container smoke script checks built HTML, immutable JavaScript assets, Nginx readiness, Django health through the proxy, three example routes and all 49 heatmap frames. All pass on localhost:8080.
+- A real POST through the Dockerized Nginx/Gunicorn stack returned HTTP 200 with live Valhalla truck routing, three LA-Phoenix routes and 95 weather locations. All 68 backend regressions also pass inside the production image.
+- Added explicit frontend readiness, faster startup health checks, configurable environment-file/port inputs, localhost-only port binding, environment-file build exclusions and a GitHub Actions container-build/smoke job.
+- Temporary hosting uses prorated compute rather than a full-month workspace subscription. The README records estimated 7/14-day costs and an explicit teardown requirement; cloud resources have not been created.

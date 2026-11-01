@@ -3,3 +3,8 @@ __pycache__
 *.sqlite3
 .venv
 tests-output
+
+.env
+.env.*
+.git
+.DS_Store
