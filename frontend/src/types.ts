@@ -1,0 +1,9 @@
+export type Place = {id?:string;label:string;lat:number;lon:number;timezone?:string}
+export type Risk = {score:number;level:string;reasons:string[]}
+export type Weather = {wind_mph:number;gust_mph:number;rain_in:number;snow_in:number;temperature_f:number;forecast_at:string}
+export type Checkpoint = {id:string;lon:number;lat:number;mile:number;eta:string;weather:Weather;risk:Risk}
+export type Route = {id:string;name:string;via:string;distance_miles:number;duration_s:number;arrival:string;geometry:{type:'LineString';coordinates:[number,number][]};checkpoints:Checkpoint[];summary:{risk_miles:Record<string,number>;average_risk:number;eligible:boolean;max_risk:number;segments:{from:string;to:string;score:number;miles:number}[]}}
+export type HeatPoint = {lon:number;lat:number;scores:number[]}
+export type Plan = {mode:'example'|'live';origin:Place;destination:Place;departure:string;load_lb:number;spacing_miles:number;routes:Route[];recommended_id:string|null;heatmap:HeatPoint[];forecast_hours:number;forecast_locations:number;generated_at:string;warnings:string[];providers:Record<string,string>}
+export const LEVELS = ['Low','Moderate','High','Severe','No Travel']
+export const COLORS = ['#3a9f83','#dfb335','#eb8b38','#df5859','#913854']
