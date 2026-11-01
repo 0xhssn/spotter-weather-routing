@@ -78,3 +78,9 @@ See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expa
 - Served a production React build on localhost:5174 against a separate production-mode Gunicorn API on localhost:8001 with an explicit origin allowlist. The browser successfully loaded the example and completed a live Valhalla/Open-Meteo comparison with three truck routes. This verifies browser CORS enforcement across distinct origins rather than relying only on a command-line HTTP check.
 - The README records exact deployment/wiring checks, estimated single-instance 7/14-day costs and a shutdown deadline within 14 days of actual deployment. The Blueprint does not automatically expire.
 - Render account sign-in is required before deployment can proceed. No hosted URLs, cloud resources or paid charges were created during local preparation.
+
+
+### Render account validation follow-up
+
+- Verified the GitHub installation uses **Only select repositories**, with exactly `0xhssn/spotter-weather-routing`, after saving its scope.
+- Render's live Blueprint validator rejected the chained `PUBLIC_API_URL` environment reference, a semantic restriction not enforced by its JSON schema. Replaced that chain with dashboard-managed `VITE_API_BASE_URL` (`sync: false`), matching the existing exact-origin CORS setting. The two public URLs must be set to their actual assigned service origins before browser verification.

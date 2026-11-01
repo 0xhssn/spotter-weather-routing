@@ -1,5 +1,5 @@
 # One paid API instance; the React static site has no paid compute plan.
-# Configure the exact frontend origin when creating the Blueprint.
+# Set the exact frontend origin and public API URL in the dashboard after provisioning.
 services:
   - type: web
     name: waywise-api
@@ -24,11 +24,6 @@ services:
         sync: false
       - key: ROUTING_CLIENT_ID
         value: waywise-spotter-assessment
-      - key: PUBLIC_API_URL
-        fromService:
-          name: waywise-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
   - type: web
     name: waywise
     runtime: static
@@ -41,10 +36,7 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: VITE_API_BASE_URL
-        fromService:
-          name: waywise-api
-          type: web
-          envVarKey: PUBLIC_API_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*
