@@ -197,6 +197,7 @@ def label_routes(routes):
     base_lat = sum(v[1] for v in routes[0]["vertices"])/len(routes[0]["vertices"])
     used = set()
     for index, route in enumerate(routes):
+        route["via"] = route.setdefault("_base_via", route["via"])
         unique = sorted(((name, length) for name, length in route.get("roads", {}).items() if name not in primary), key=lambda item: -item[1])
         if index:
             latitude = sum(v[1] for v in route["vertices"])/len(route["vertices"])

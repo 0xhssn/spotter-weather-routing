@@ -53,4 +53,4 @@ Remaining assignment delivery gaps: hosted application and 5–10 minute Loom wa
 
 ## QA brief follow-up — November 1, 2026
 
-See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expanded 85-test regression suite, live long-haul checks, render measurements and deterministic risk-state screenshots. This supersedes earlier application limits, timing display and test counts.
+See `qa-fixes.md` for the implemented findings, preserved scoring behavior, expanded 86-test regression suite, live long-haul checks, render measurements and deterministic risk-state screenshots. This supersedes earlier application limits, timing display and test counts.

@@ -127,6 +127,13 @@ class GeometryAndLongHaulTests(SimpleTestCase):
         self.assertIn(points[50][:2],simplify_geometry(points))
         self.assertEqual(len(points),100)
 
+    def test_route_labels_remain_stable_when_normalized_during_plan_assembly(self):
+        routes=[parse_osrm_route(raw_route(bend),i) for i,bend in enumerate([0,.4,-.4])]
+        label_routes(routes)
+        first=[r['via'] for r in routes]
+        label_routes(routes)
+        self.assertEqual([r['via'] for r in routes],first)
+
     def test_labels_distinguish_corridors_without_step_names(self):
         routes=[parse_osrm_route(raw_route(bend),i) for i,bend in enumerate([0,.4,-.4])]
         label_routes(routes)

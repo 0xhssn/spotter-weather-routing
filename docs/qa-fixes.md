@@ -26,7 +26,7 @@ Additional regression found during browser QA: the initial example could overwri
 ## Checks actually performed
 
 - A GitHub Actions workflow runs regression checks on pushes to main and pull requests.
-- 55 Django tests and 30 frontend tests pass; Django system checks and TypeScript/Vite production build pass.
+- 56 Django tests and 30 frontend tests pass; Django system checks and TypeScript/Vite production build pass.
 - Tests run with `TZ=Asia/Makassar`, including the origin-time and DST cases.
 - Original scoring module compared byte-for-byte with the initial commit and left unchanged.
 - Live comparisons: LA–Phoenix (3 truck routes, 8.16 s, 9.7 KB gzip), Denver–Chicago at 10 mi (3 truck routes, 4.81 s, 43.7 KB), LA–Dallas (2 car-profile routes with opt-in, 4.27 s, 27.4 KB), Houston–Chicago (2 car-profile routes, 4.55 s, 19.9 KB), Seattle–Miami (2 car-profile routes, 4.64 s, 57.9 KB). These are individual local observations, not a statistically established p95 or provider availability guarantee. Two initial public-provider failures were followed by successful rechecks; bounded retries were added and tested.
