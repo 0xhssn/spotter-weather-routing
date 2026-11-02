@@ -168,7 +168,7 @@ backend/planner/providers.py Provider adapters, batching and cache
 backend/planner/service.py   Trip orchestration, forecast matching
 backend/planner/tests.py     Boundary and integration tests
 frontend/src/            React UI, city search, Leaflet/canvas map
-docs/                    Source assessment and walkthrough outline
+docs/                    Source assessment and verification notes
 ```
 
 

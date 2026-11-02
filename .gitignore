@@ -13,3 +13,6 @@ dist/
 *.tsbuildinfo
 
 .demo-access*.json
+
+# Keep the Loom recording script local.
+/docs/walkthrough.md
