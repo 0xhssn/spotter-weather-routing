@@ -9,6 +9,7 @@ from functools import wraps
 from django.conf import settings
 from django.core.cache import cache
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from config.demo_access import issue_access_token
 from .budget import provider_budget
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -156,4 +157,7 @@ def example(request):
 @require_http_methods(['GET', 'POST'])
 def access(request):
     # GET advertises the gate; POST is verified by middleware before this view.
-    return JsonResponse({'password_required': bool(settings.DEMO_ACCESS_PASSWORD_SHA256)})
+    data = {'password_required': bool(settings.DEMO_ACCESS_PASSWORD_SHA256)}
+    if request.method == 'POST' and getattr(request, 'demo_password_authenticated', False):
+        data['access_token'] = issue_access_token()
+    return JsonResponse(data)

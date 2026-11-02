@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { ArrowDownUp, ArrowRight, ChevronDown, FlaskConical, LoaderCircle, Navigation, Truck, X } from 'lucide-react'
 import { api, ApiError } from './api'
+import { DemoLogoutContext } from './AccessGate'
 import { PlaceSearch } from './PlaceSearch'
 import { EmptyPlanner } from './EmptyPlanner'
 import { ForecastPanel } from './ForecastPanel'
@@ -12,6 +13,7 @@ import type { TripNote } from './TripOverview'
 import type { Checkpoint, Place, Plan } from './types'
 
 export default function App(){
+  const logout=useContext(DemoLogoutContext)
   const inputZone=useRef(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
   const locationEdits=useRef(0)
   const [origin,setOrigin]=useState<Place|null>(null)
@@ -98,8 +100,8 @@ export default function App(){
   const selected=plan?.routes.find(r=>r.id===selectedId)
   const zone=inputZone.current
   const resultZone=originZone(plan?.origin.timezone)
-  let parsedDeparture='', departureZone=zone
-  try {parsedDeparture=departureISO(departure,zone);departureZone=zoneLabel(parsedDeparture,zone)} catch { /* Validation message appears on submit. */ }
+  let parsedDeparture='', departureZone=zone, departureError=''
+  try {parsedDeparture=departureISO(departure,zone);departureZone=zoneLabel(parsedDeparture,zone)} catch (error) {departureError=error instanceof Error ? error.message : 'Choose a valid departure time.'}
   const changeDestination=(place:Place|null)=>{locationEdits.current++;setDestination(place)}
   const changeOrigin=(place:Place|null)=>{
     locationEdits.current++
@@ -108,13 +110,14 @@ export default function App(){
   }
   const dirty=!!plan&&(origin?.lat!==plan.origin.lat||origin?.lon!==plan.origin.lon||destination?.lat!==plan.destination.lat||destination?.lon!==plan.destination.lon||load!==plan.load_lb||spacing!==plan.spacing_miles||allowRoad!==!!plan.allow_road_fallback||!parsedDeparture||Date.parse(parsedDeparture)!==Date.parse(plan.departure))
   const departureMs=Date.parse(parsedDeparture),now=Date.now()
+  const departureOutsideWindow=!!parsedDeparture&&(departureMs<Math.floor(now/60000)*60000||departureMs>Math.floor((now+7*86400000)/60000)*60000)
   const invalidInput=!origin||!destination?'Choose both cities from the search results.':
     Math.abs(origin.lat-destination.lat)+Math.abs(origin.lon-destination.lon)<.01?'Choose different origin and destination cities.':
-    !parsedDeparture?'Choose a valid, unambiguous departure time at the origin.':
-    departureMs<Math.floor(now/60000)*60000||departureMs>Math.floor((now+7*86400000)/60000)*60000?'Choose a departure between now and seven days from now.':
+    !parsedDeparture?departureError:
+    departureOutsideWindow?'Choose a departure between now and seven days from now.':
     !Number.isInteger(load)||load<0||load>100000?'Enter a whole-number load between 0 and 100,000 lb.':''
   const canCompare=!busy&&retryAfter===0&&!invalidInput
-  const showUpdateBadge=dirty&&!busy
+  const showUpdateBadge=dirty&&!busy&&!invalidInput&&retryAfter===0
   const stale=!!plan&&(dirty||!!error)
   const unavailable=stale||busy
   const compareHelp=busy?'':retryAfter>0?'Retry available after the countdown.':invalidInput||
@@ -130,18 +133,18 @@ export default function App(){
     notes.push({id:warning,tone:'info',text:warning.includes('distinct route(s)')?`Only ${plan.routes.length} different ${plan.routes.length===1?'route was':'routes were'} found.`:warning})
   }
   return <div className="app-shell">
-    <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span></header>
+    <header className="topbar"><a className="brand" href="/" aria-label="Waywise home"><span className="brand-icon"><Navigation size={22} fill="currentColor"/></span>waywise<span className="brand-dot">.</span></a><span className="brand-divider"/><span className="product-label">WEATHER-AWARE ROUTING</span>{logout&&<button type="button" className="logout-button" onClick={logout}>Log out</button>}</header>
     <div className="workspace">
       <aside className="sidebar">
         <div className="sidebar-title"><h2>Plan your trip</h2></div>
         <form onSubmit={compare}>
           <div className="location-fields"><PlaceSearch label="Origin" value={origin} onChange={changeOrigin}/><button type="button" className="swap-button" aria-label="Swap origin and destination" disabled={!origin||!destination} onClick={()=>{changeOrigin(destination);setDestination(origin)}}><ArrowDownUp size={14}/></button><PlaceSearch label="Destination" value={destination} onChange={changeDestination}/></div>
-          <label className="field-label" htmlFor="departure">Departure <span>{origin ? `At origin · ${departureZone}` : 'Select an origin'}</span></label><input id="departure" type="datetime-local" value={departure} min={localInput(new Date(),zone)} max={localInput(new Date(Date.now()+7*86400000),zone)} onChange={e=>setDeparture(e.target.value)} required/>
+          <label className="field-label" htmlFor="departure">Departure <span>{origin ? `At origin · ${departureZone}` : 'Select an origin'}</span></label><input id="departure" type="datetime-local" value={departure} min={localInput(new Date(),zone)} max={localInput(new Date(Date.now()+7*86400000),zone)} onChange={e=>setDeparture(e.target.value)} aria-invalid={!!origin&&(!!departureError||departureOutsideWindow)} aria-describedby="compare-help" required/>
           <div className="load-heading"><label htmlFor="load">Load weight</label><Truck size={15}/></div><div className="weight-input"><input id="load" type="number" min="0" max="100000" step="1" required value={load} onChange={e=>setLoad(Number(e.target.value))}/><span>lb</span></div>
           <div className="spacing-heading"><span id="spacing-label">Check weather every</span></div><div className="segmented" role="group" aria-labelledby="spacing-label">{[10,25,50].map(n=><button key={n} type="button" aria-pressed={spacing===n} className={spacing===n?'selected':''} onClick={()=>setSpacing(n)}>{n} mi</button>)}</div>
           <fieldset className="long-trips"><legend>Long trips</legend><label className="fallback-option" htmlFor="allow-road"><input id="allow-road" type="checkbox" checked={allowRoad} onChange={e=>setAllowRoad(e.target.checked)} aria-describedby="fallback-help"/>Allow car-profile comparison</label><p id="fallback-help" className="fallback-help">If the trip exceeds the truck router’s distance limit, compare car routes instead. Truck restrictions are not checked.</p></fieldset>
           <button type="submit" className={`primary-button${showUpdateBadge?' has-updates':''}`} disabled={!canCompare} aria-busy={busy} aria-describedby="compare-help">{retryAfter>0?<>Try again in {retryAfter}s</>:busy?<><LoaderCircle size={17} className="spin"/>Comparing routes…</>:<span className="compare-button-label">Compare live routes<ArrowRight size={17}/></span>}{showUpdateBadge&&<span className="compare-update-badge" aria-hidden="true">Update needed</span>}</button>
-          <p id="compare-help" className={`compare-help${dirty?' sr-only':''}`}>{compareHelp}</p>
+          <p id="compare-help" className={`compare-help${dirty&&!invalidInput&&!retryAfter?' sr-only':''}`} role={invalidInput&&origin&&destination?'status':undefined}>{compareHelp}</p>
           <button type="button" className="example-button" onClick={()=>void example()} disabled={busy}><FlaskConical size={14}/>Load example scenario</button>
         </form>
       </aside>

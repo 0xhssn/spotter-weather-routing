@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from unittest.mock import patch
 
 from django.test import SimpleTestCase, override_settings
@@ -57,6 +58,24 @@ class DemoAccessTests(SimpleTestCase):
         with override_settings(DEMO_ACCESS_PASSWORD_SHA256=hashlib.sha256(b'new-password').hexdigest()):
             self.assertEqual(self.client.post('/api/access', HTTP_AUTHORIZATION='Bearer ' + PASSWORD).status_code, 401)
             self.assertEqual(self.client.post('/api/access', HTTP_AUTHORIZATION='Bearer new-password').status_code, 200)
+
+    def test_signed_token_can_reopen_planner_and_access_protected_data(self):
+        response = self.client.post('/api/access', HTTP_AUTHORIZATION='Bearer ' + PASSWORD)
+        token = response.json()['access_token']
+        self.assertNotIn(PASSWORD, token)
+        self.assertNotIn(DIGEST, token)
+        headers = {'HTTP_AUTHORIZATION': 'Bearer ' + token}
+        self.assertEqual(self.client.post('/api/access', **headers).status_code, 200)
+        # Revalidation must not renew the original token's expiry.
+        self.assertNotIn('access_token', self.client.post('/api/access', **headers).json())
+        self.assertEqual(self.client.get('/api/example', **headers).status_code, 200)
+        with patch('django.core.signing.time.time', return_value=time.time() + 12*3600 + 1):
+            self.assertEqual(self.client.get('/api/example', **headers).status_code, 401)
+        self.assertEqual(self.client.get('/api/example', HTTP_AUTHORIZATION='Bearer ' + token + 'x').status_code, 401)
+        with override_settings(DEMO_ACCESS_PASSWORD_SHA256=hashlib.sha256(b'new-password').hexdigest()):
+            self.assertEqual(self.client.get('/api/example', **headers).status_code, 401)
+        with override_settings(SECRET_KEY='rotated-secret', SECRET_KEY_FALLBACKS=[]):
+            self.assertEqual(self.client.get('/api/example', **headers).status_code, 401)
 
     def test_cross_origin_authorization_preflight_does_not_require_password(self):
         response = self.client.options('/api/plan', HTTP_ORIGIN=ORIGIN,

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
+import { DemoLogoutContext } from './AccessGate'
 import { api } from './api'
 import type { Plan } from './types'
 import { ApiError } from './api'
@@ -422,4 +423,43 @@ it('shows loading on the empty map and allows retry after the first comparison f
   expect(screen.getByRole('alert')).toHaveTextContent('Weather unavailable.')
   expect(screen.getByRole('button',{name:'Compare live routes'})).toBeEnabled()
   expect(screen.getByRole('heading',{name:'Where are you headed?'})).toBeInTheDocument()
+})
+
+
+it.each([
+  {value:'2026-11-01T10:00', message:/between now and seven days/},
+  {value:'2026-11-11T10:00', message:/between now and seven days/},
+  {value:'', message:/valid, unambiguous/},
+])('explains invalid departure $value instead of only showing Update needed', async ({value, message}) => {
+  await showLivePlan()
+  fireEvent.change(screen.getByLabelText(/Departure/), {target:{value}})
+  const button=screen.getByRole('button', {name:'Compare live routes'})
+  expect(button).toBeDisabled()
+  expect(within(button).queryByText('Update needed')).not.toBeInTheDocument()
+  expect(document.getElementById('compare-help')).toHaveTextContent(message)
+  expect(document.getElementById('compare-help')).not.toHaveClass('sr-only')
+  expect(screen.getByLabelText(/Departure/)).toHaveAttribute('aria-invalid','true')
+  fireEvent.change(screen.getByLabelText(/Departure/), {target:{value:'2026-11-03T10:30'}})
+  expect(button).toBeEnabled()
+  expect(within(button).getByText('Update needed')).toBeInTheDocument()
+})
+
+it('shows the DST explanation when an edited departure is ambiguous', async () => {
+  vi.spyOn(Date,'now').mockReturnValue(Date.parse('2026-11-01T06:00:00Z'))
+  vi.mocked(api).mockResolvedValueOnce(plan())
+  renderWithExample()
+  await screen.findByText('Route 1 is your lower-risk option')
+  fireEvent.change(screen.getByLabelText(/Departure/), {target:{value:'2026-11-01T01:30'}})
+  expect(screen.getByRole('button', {name:'Compare live routes'})).toBeDisabled()
+  expect(document.getElementById('compare-help')).toHaveTextContent('daylight saving')
+  fireEvent.change(screen.getByLabelText(/Departure/), {target:{value:'2026-11-01T02:30'}})
+  expect(screen.getByRole('button', {name:'Compare live routes'})).toBeEnabled()
+})
+
+
+it('places the logout action in the app header', () => {
+  const logout=vi.fn()
+  render(<DemoLogoutContext.Provider value={logout}><App/></DemoLogoutContext.Provider>)
+  fireEvent.click(within(screen.getByRole('banner')).getByRole('button',{name:'Log out'}))
+  expect(logout).toHaveBeenCalledOnce()
 })

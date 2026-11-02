@@ -1910,3 +1910,17 @@ input::placeholder {
 .access-card .primary-button { margin-top: .5rem; }
 .access-card .access-error { color: #a12f37; margin-top: 1rem; }
 .access-card .access-note { font-size: var(--text-md); margin: 1.25rem 0 0; color: #4d6157; }
+
+.logout-button {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: .625rem .875rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: white;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.logout-button:hover { background: #f4f6f2; }
